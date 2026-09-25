@@ -1,0 +1,41 @@
+<%- include('../partials/layout-start', { title: 'Customers', activeNav: 'customers' }) %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <form method="GET" action="/customers" class="d-flex gap-2">
+    <input type="text" name="q" class="form-control form-control-sm" style="width: 260px" placeholder="Search name, phone or GSTIN" value="<%= q %>">
+    <button type="submit" class="btn btn-sm btn-outline-secondary">Search</button>
+  </form>
+  <a href="/customers/new" class="btn btn-accent"><i class="lucide-plus"></i> Add Customer</a>
+</div>
+
+<div class="card">
+  <div class="table-scroll">
+    <table class="table table-app mb-0">
+      <thead>
+        <tr><th>Name</th><th>Phone</th><th>GSTIN</th><th>Type</th><th>State</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% if (customers.length === 0) { %>
+          <tr><td colspan="6">
+            <div class="empty-state">
+              <i class="lucide-users"></i>
+              No customers yet. <a href="/customers/new">Add your first customer</a>.
+            </div>
+          </td></tr>
+        <% } %>
+        <% customers.forEach(function(c) { %>
+          <tr>
+            <td><a href="/customers/<%= c.id %>/edit" class="fw-semibold"><%= c.name %></a></td>
+            <td><%= c.phone || '-' %></td>
+            <td><%= c.gstin || '-' %></td>
+            <td><%= c.customerType %></td>
+            <td><%= c.state %></td>
+            <td><a href="/customers/<%= c.id %>/edit" class="btn btn-sm btn-outline-secondary">Edit</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('../partials/layout-end') %>

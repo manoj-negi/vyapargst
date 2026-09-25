@@ -1,0 +1,101 @@
+<%- include('../partials/layout-start', { title: 'Business Profile', activeNav: 'business' }) %>
+
+<div class="card p-4" style="max-width: 820px;">
+  <h5 class="fw-bold mb-1">Business Profile</h5>
+  <p class="text-muted small mb-4">This information appears automatically on every invoice you create.</p>
+
+  <% if (errors && errors.length) { %>
+    <div class="alert alert-danger py-2 small">
+      <ul class="mb-0 ps-3">
+        <% errors.forEach(function(e) { %><li><%= e %></li><% }) %>
+      </ul>
+    </div>
+  <% } %>
+
+  <form method="POST" action="/business/setup" enctype="multipart/form-data">
+    <div class="form-section-title">Business Details</div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Business Name *</label>
+        <input type="text" name="name" class="form-control" required value="<%= business ? business.name || '' : '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Trade Name</label>
+        <input type="text" name="tradeName" class="form-control" value="<%= business ? business.tradeName || '' : '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Business Logo</label>
+        <input type="file" name="logo" class="form-control" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+        <% if (business && business.logoPath) { %>
+          <img src="<%= business.logoPath %>" class="mt-2" style="height:40px;border-radius:6px" alt="Current logo">
+        <% } %>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Business Type</label>
+        <input type="text" name="businessType" class="form-control" placeholder="e.g. Retailer, Wholesaler, Manufacturer" value="<%= business ? business.businessType || '' : '' %>">
+      </div>
+    </div>
+
+    <div class="form-section-title">GST Registration</div>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">GST Registered</label>
+        <select name="gstRegistered" class="form-select">
+          <option value="YES" <%= (!business || business.gstRegistered) ? 'selected' : '' %>>Yes</option>
+          <option value="NO" <%= (business && !business.gstRegistered) ? 'selected' : '' %>>No</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">GSTIN</label>
+        <input type="text" name="gstin" class="form-control text-uppercase" maxlength="15" placeholder="22AAAAA0000A1Z5" value="<%= business ? business.gstin || '' : '' %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">PAN</label>
+        <input type="text" name="pan" class="form-control text-uppercase" maxlength="10" value="<%= business ? business.pan || '' : '' %>">
+      </div>
+    </div>
+
+    <div class="form-section-title">Contact & Address</div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Phone</label>
+        <input type="text" name="phone" class="form-control" placeholder="9876543210" value="<%= business ? business.phone || '' : '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Email</label>
+        <input type="email" name="email" class="form-control" value="<%= business ? business.email || '' : '' %>">
+      </div>
+      <div class="col-12">
+        <label class="form-label small fw-semibold">Address</label>
+        <textarea name="address" class="form-control" rows="2"><%= business ? business.address || '' : '' %></textarea>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">City</label>
+        <input type="text" name="city" class="form-control" value="<%= business ? business.city || '' : '' %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">State *</label>
+        <select name="state" class="form-select" required>
+          <option value="">Select state</option>
+          <% states.forEach(function(s) { %>
+            <option value="<%= s %>" <%= business && business.state === s ? 'selected' : '' %>><%= s %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Pincode</label>
+        <input type="text" name="pincode" class="form-control" maxlength="6" value="<%= business ? business.pincode || '' : '' %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Country</label>
+        <input type="text" name="country" class="form-control" value="<%= business ? business.country || 'India' : 'India' %>">
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <button type="submit" class="btn btn-primary-app px-4">Save Business Profile</button>
+    </div>
+  </form>
+</div>
+
+<%- include('../partials/layout-end') %>

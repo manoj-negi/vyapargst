@@ -1,0 +1,150 @@
+<%- include('../partials/layout-start', { title: 'Create Sale Invoice', activeNav: 'invoices' }) %>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger py-2 small">
+    <ul class="mb-0 ps-3"><% errors.forEach(function(e) { %><li><%= e %></li><% }) %></ul>
+  </div>
+<% } %>
+
+<form method="POST" action="/invoices" id="invoiceForm" data-business-state="<%= business.state %>">
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card p-4 mb-4">
+        <div class="d-flex justify-content-between flex-wrap gap-3">
+          <div style="min-width: 260px;">
+            <h6 class="fw-bold text-uppercase text-muted small mb-3">Sale</h6>
+            <label class="form-label small fw-semibold">Customer *</label>
+            <select name="customerId" id="customerSelect" class="form-select" required>
+              <option value="">Select Customer</option>
+              <% customers.forEach(function(c) { %>
+                <option value="<%= c.id %>" data-state="<%= c.state %>"><%= c.name %><%= c.phone ? ' · ' + c.phone : '' %></option>
+              <% }) %>
+            </select>
+            <div class="mt-2">
+              <span id="placeOfSupplyBadge" class="badge text-bg-secondary">Select a customer</span>
+            </div>
+          </div>
+          <div style="min-width: 220px;">
+            <label class="form-label small fw-semibold">Invoice Date</label>
+            <input type="date" name="invoiceDate" class="form-control" value="<%= new Date().toISOString().slice(0,10) %>">
+            <label class="form-label small fw-semibold mt-2">Due Date</label>
+            <input type="date" name="dueDate" class="form-control">
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-3">
+        <div class="table-scroll">
+          <table class="table table-app mb-2" style="min-width: 900px;">
+            <thead>
+              <tr>
+                <th style="width:32px;">#</th>
+                <th style="min-width:220px;">Item</th>
+                <th style="width:80px;">Qty</th>
+                <th style="width:70px;">Unit</th>
+                <th style="width:100px;">Price/Unit</th>
+                <th style="width:120px;">Discount</th>
+                <th style="width:100px;">Taxable</th>
+                <th style="width:60px;">GST</th>
+                <th class="col-cgst-sgst" style="width:90px;">CGST</th>
+                <th class="col-cgst-sgst" style="width:90px;">SGST</th>
+                <th class="col-igst d-none" style="width:90px;">IGST</th>
+                <th style="width:100px;">Total</th>
+                <th style="width:36px;"></th>
+              </tr>
+            </thead>
+            <tbody id="itemsTbody"></tbody>
+          </table>
+        </div>
+        <button type="button" id="addRowBtn" class="btn btn-sm btn-outline-primary">+ Add Row</button>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card p-4 invoice-totals-box">
+        <h6 class="fw-bold text-uppercase text-muted small mb-3">Invoice Total</h6>
+
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-muted small">Invoice Discount</span>
+          <div class="d-flex gap-1" style="width: 150px;">
+            <input type="number" id="invoiceDiscountValue" class="form-control form-control-sm" value="0" min="0" step="0.01">
+            <select id="invoiceDiscountType" class="form-select form-select-sm" style="width: 70px;">
+              <option value="PERCENTAGE">%</option>
+              <option value="FIXED">₹</option>
+            </select>
+          </div>
+        </div>
+
+        <hr>
+        <div class="d-flex justify-content-between small mb-1"><span>Subtotal</span><span id="subtotalDisplay">₹0.00</span></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Discount</span><span id="discountDisplay">₹0.00</span></div>
+        <div class="d-flex justify-content-between small mb-1 fw-semibold"><span>Taxable Amount</span><span id="taxableDisplay">₹0.00</span></div>
+        <div class="d-flex justify-content-between small mb-1 col-cgst-sgst"><span>CGST</span><span id="cgstDisplay">₹0.00</span></div>
+        <div class="d-flex justify-content-between small mb-1 col-cgst-sgst"><span>SGST</span><span id="sgstDisplay">₹0.00</span></div>
+        <div class="d-flex justify-content-between small mb-1 col-igst d-none"><span>IGST</span><span id="igstDisplay">₹0.00</span></div>
+        <div class="d-flex justify-content-between small mb-1"><span>CESS</span><span id="cessDisplay">₹0.00</span></div>
+        <div class="d-flex justify-content-between small mb-1"><span>Round Off</span><span id="roundOffDisplay">₹0.00</span></div>
+        <hr>
+        <div class="d-flex justify-content-between fs-5 fw-bold mb-3"><span>TOTAL</span><span id="grandTotalDisplay">₹0.00</span></div>
+        <input type="hidden" id="grandTotalHidden" value="0">
+
+        <div class="form-section-title">Payment</div>
+        <label class="form-label small fw-semibold">Payment Type</label>
+        <select name="paymentType" class="form-select mb-2">
+          <option value="CASH">Cash</option>
+          <option value="UPI">UPI</option>
+          <option value="BANK_TRANSFER">Bank Transfer</option>
+          <option value="CARD">Card</option>
+          <option value="CREDIT">Credit</option>
+          <option value="OTHER">Other</option>
+        </select>
+        <label class="form-label small fw-semibold">Received Amount</label>
+        <input type="number" name="receivedAmount" id="receivedInput" class="form-control mb-2" min="0" step="0.01" value="0">
+        <div class="d-flex justify-content-between small mb-2">
+          <span class="text-muted">Balance</span>
+          <span id="balanceDisplay">₹0.00</span>
+        </div>
+        <span id="paymentStatusBadge" class="status-badge status-unpaid">UNPAID</span>
+
+        <button type="submit" class="btn btn-primary-app w-100 mt-4 py-2" data-shortcut-save>Save Invoice (Ctrl+S)</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<template id="itemRowTemplate">
+  <tr class="invoice-item-row">
+    <td class="row-number">1</td>
+    <td style="position: relative;">
+      <input type="text" class="form-control form-control-sm item-name-input" data-name="productName" placeholder="Type item name..." autocomplete="off" required>
+      <input type="hidden" class="product-id-input" data-name="productId">
+      <input type="hidden" class="hsn-input" data-name="hsn">
+      <input type="hidden" class="unit-input" data-name="unit">
+      <input type="hidden" class="price-type-input" data-name="priceType" value="EXCLUSIVE">
+      <input type="hidden" class="gst-rate-input" data-name="gstRate" value="0">
+      <div class="autocomplete-menu"></div>
+    </td>
+    <td><input type="number" class="form-control form-control-sm qty-input" data-name="quantity" min="0.01" step="0.01" value="1"></td>
+    <td><span class="unit-display">-</span></td>
+    <td><input type="number" class="form-control form-control-sm price-input" data-name="unitPrice" min="0" step="0.01" value="0"></td>
+    <td>
+      <div class="d-flex gap-1">
+        <input type="number" class="form-control form-control-sm discount-input" data-name="discountValue" min="0" step="0.01" value="0">
+        <select class="form-select form-select-sm discount-type-select" data-name="discountType">
+          <option value="PERCENTAGE">%</option>
+          <option value="FIXED">₹</option>
+        </select>
+      </div>
+    </td>
+    <td class="taxable-cell">₹0.00</td>
+    <td class="gst-rate-cell-label">0%</td>
+    <td class="cgst-cell col-cgst-sgst">₹0.00</td>
+    <td class="sgst-cell col-cgst-sgst">₹0.00</td>
+    <td class="igst-cell col-igst d-none">₹0.00</td>
+    <td class="total-cell fw-semibold">₹0.00</td>
+    <td><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="lucide-trash-2"></i>×</button></td>
+  </tr>
+</template>
+
+<script src="/js/invoice-form.js"></script>
+<%- include('../partials/layout-end') %>

@@ -1,0 +1,72 @@
+<%- include('../partials/layout-start', { title: customer && customer.id ? 'Edit Customer' : 'Add Customer', activeNav: 'customers' }) %>
+
+<div class="card p-4" style="max-width: 720px;">
+  <h5 class="fw-bold mb-3"><%= customer && customer.id ? 'Edit Customer' : 'Add Customer' %></h5>
+
+  <% if (errors && errors.length) { %>
+    <div class="alert alert-danger py-2 small">
+      <ul class="mb-0 ps-3"><% errors.forEach(function(e) { %><li><%= e %></li><% }) %></ul>
+    </div>
+  <% } %>
+
+  <form method="POST" action="<%= customer && customer.id ? '/customers/' + customer.id : '/customers' %>">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Customer Name *</label>
+        <input type="text" name="name" class="form-control" required value="<%= customer ? customer.name || '' : '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Customer Type</label>
+        <select name="customerType" class="form-select">
+          <option value="CONSUMER" <%= (!customer || customer.customerType === 'CONSUMER') ? 'selected' : '' %>>Consumer</option>
+          <option value="REGISTERED" <%= (customer && customer.customerType === 'REGISTERED') ? 'selected' : '' %>>Registered</option>
+          <option value="UNREGISTERED" <%= (customer && customer.customerType === 'UNREGISTERED') ? 'selected' : '' %>>Unregistered</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Phone</label>
+        <input type="text" name="phone" class="form-control" placeholder="9876543210" value="<%= customer ? customer.phone || '' : '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Email</label>
+        <input type="email" name="email" class="form-control" value="<%= customer ? customer.email || '' : '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">GSTIN</label>
+        <input type="text" name="gstin" class="form-control text-uppercase" maxlength="15" value="<%= customer ? customer.gstin || '' : '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">PAN</label>
+        <input type="text" name="pan" class="form-control text-uppercase" maxlength="10" value="<%= customer ? customer.pan || '' : '' %>">
+      </div>
+      <div class="col-12">
+        <label class="form-label small fw-semibold">Billing Address</label>
+        <textarea name="billingAddress" class="form-control" rows="2"><%= customer ? customer.billingAddress || '' : '' %></textarea>
+      </div>
+      <div class="col-12">
+        <label class="form-label small fw-semibold">Shipping Address</label>
+        <textarea name="shippingAddress" class="form-control" rows="2"><%= customer ? customer.shippingAddress || '' : '' %></textarea>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">State *</label>
+        <select name="state" class="form-select" required>
+          <option value="">Select state</option>
+          <% states.forEach(function(s) { %>
+            <option value="<%= s %>" <%= customer && customer.state === s ? 'selected' : '' %>><%= s %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Pincode</label>
+        <input type="text" name="pincode" class="form-control" maxlength="6" value="<%= customer ? customer.pincode || '' : '' %>">
+      </div>
+    </div>
+
+    <div class="mt-4 d-flex gap-2">
+      <button type="submit" class="btn btn-primary-app px-4" data-shortcut-save>Save Customer</button>
+      <a href="/customers" class="btn btn-outline-secondary px-4">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<%- include('../partials/layout-end') %>

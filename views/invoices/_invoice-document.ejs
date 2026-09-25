@@ -1,0 +1,144 @@
+<style>
+  .invoice-doc { font-family: "Segoe UI", Roboto, Arial, sans-serif; color: #1f2937; font-size: 13px; background: #fff; padding: 28px; max-width: 800px; margin: 0 auto; }
+  .invoice-doc h1, .invoice-doc h2, .invoice-doc h3 { margin: 0; }
+  .invoice-doc .doc-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1f2937; padding-bottom: 14px; margin-bottom: 14px; }
+  .invoice-doc .doc-logo { height: 48px; margin-bottom: 8px; }
+  .invoice-doc .biz-name { font-size: 19px; font-weight: 700; }
+  .invoice-doc .doc-meta { text-align: right; font-size: 12px; }
+  .invoice-doc .tax-invoice-title { text-align: center; font-size: 15px; font-weight: 700; letter-spacing: 0.08em; margin: 10px 0; text-transform: uppercase; }
+  .invoice-doc .bill-to-row { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 14px; }
+  .invoice-doc .bill-to-row .box { flex: 1; }
+  .invoice-doc .box-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; margin-bottom: 4px; font-weight: 700; }
+  .invoice-doc table.items { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 14px; }
+  .invoice-doc table.items th, .invoice-doc table.items td { border: 1px solid #d1d5db; padding: 5px 7px; text-align: right; }
+  .invoice-doc table.items th:nth-child(1), .invoice-doc table.items td:nth-child(1),
+  .invoice-doc table.items th:nth-child(2), .invoice-doc table.items td:nth-child(2) { text-align: left; }
+  .invoice-doc table.items th { background: #f3f4f6; }
+  .invoice-doc .tax-summary { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 14px; }
+  .invoice-doc .tax-summary th, .invoice-doc .tax-summary td { border: 1px solid #d1d5db; padding: 4px 7px; text-align: right; }
+  .invoice-doc .tax-summary th { background: #f3f4f6; }
+  .invoice-doc .totals-row { display: flex; justify-content: flex-end; }
+  .invoice-doc .totals-box { width: 280px; font-size: 12.5px; }
+  .invoice-doc .totals-box .line { display: flex; justify-content: space-between; padding: 3px 0; }
+  .invoice-doc .totals-box .grand { border-top: 2px solid #1f2937; margin-top: 6px; padding-top: 6px; font-size: 15px; font-weight: 700; }
+  .invoice-doc .words-row { margin: 12px 0; font-size: 12px; }
+  .invoice-doc .status-line { margin: 10px 0; font-weight: 700; }
+  .invoice-doc .footer-row { display: flex; justify-content: space-between; margin-top: 50px; font-size: 12px; }
+  .invoice-doc .sign-box { text-align: center; width: 200px; border-top: 1px solid #9ca3af; padding-top: 6px; }
+</style>
+
+<div class="invoice-doc">
+  <div class="doc-header">
+    <div>
+      <% if (business.logoPath) { %><img src="<%= business.logoPath %>" class="doc-logo" alt="Logo"><% } %>
+      <div class="biz-name"><%= business.name %></div>
+      <div><%= business.address || '' %><%= business.city ? ', ' + business.city : '' %><%= business.state ? ', ' + business.state : '' %> <%= business.pincode || '' %></div>
+      <div><%= business.phone || '' %><%= business.phone && business.email ? ' · ' : '' %><%= business.email || '' %></div>
+      <% if (business.gstin) { %><div><strong>GSTIN:</strong> <%= business.gstin %></div><% } %>
+    </div>
+    <div class="doc-meta">
+      <div><strong>Invoice No:</strong> <%= invoice.invoiceNo %></div>
+      <div><strong>Invoice Date:</strong> <%= new Date(invoice.invoiceDate).toLocaleDateString('en-IN') %></div>
+      <% if (invoice.dueDate) { %><div><strong>Due Date:</strong> <%= new Date(invoice.dueDate).toLocaleDateString('en-IN') %></div><% } %>
+    </div>
+  </div>
+
+  <div class="tax-invoice-title">Tax Invoice</div>
+
+  <div class="bill-to-row">
+    <div class="box">
+      <div class="box-label">Bill To</div>
+      <div><strong><%= customer.name %></strong></div>
+      <div><%= customer.billingAddress || '' %></div>
+      <% if (customer.gstin) { %><div>GSTIN: <%= customer.gstin %></div><% } %>
+      <div>State: <%= customer.state %></div>
+    </div>
+    <div class="box" style="text-align:right;">
+      <div class="box-label">Place of Supply</div>
+      <div><%= invoice.placeOfSupply %> (<%= invoice.taxType === 'INTRA_STATE' ? 'Intra-State' : 'Inter-State' %>)</div>
+    </div>
+  </div>
+
+  <table class="items">
+    <thead>
+      <tr>
+        <th>#</th><th>Item</th><th>HSN</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Discount</th><th>Taxable</th>
+        <% if (invoice.taxType === 'INTRA_STATE') { %><th>CGST</th><th>SGST</th><% } else { %><th>IGST</th><% } %>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% items.forEach(function(item, i) { %>
+        <tr>
+          <td><%= i + 1 %></td>
+          <td><%= item.productName %></td>
+          <td><%= item.hsn || '-' %></td>
+          <td><%= Number(item.quantity) %></td>
+          <td><%= item.unit || '-' %></td>
+          <td>₹<%= Number(item.rate).toFixed(2) %></td>
+          <td><%= Number(item.discount) %><%= item.discountType === 'PERCENTAGE' ? '%' : '' %></td>
+          <td>₹<%= Number(item.taxableAmount).toFixed(2) %></td>
+          <% if (invoice.taxType === 'INTRA_STATE') { %>
+            <td>₹<%= Number(item.cgst).toFixed(2) %></td>
+            <td>₹<%= Number(item.sgst).toFixed(2) %></td>
+          <% } else { %>
+            <td>₹<%= Number(item.igst).toFixed(2) %></td>
+          <% } %>
+          <td>₹<%= Number(item.finalAmount).toFixed(2) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <table class="tax-summary">
+    <thead>
+      <tr>
+        <th style="text-align:left;">Tax Rate</th><th>Taxable Amount</th>
+        <% if (invoice.taxType === 'INTRA_STATE') { %><th>CGST</th><th>SGST</th><% } else { %><th>IGST</th><% } %>
+      </tr>
+    </thead>
+    <tbody>
+      <% taxGroups.forEach(function(g) { %>
+        <tr>
+          <td style="text-align:left;"><%= g.taxRate %>%</td>
+          <td>₹<%= g.taxableAmount.toFixed(2) %></td>
+          <% if (invoice.taxType === 'INTRA_STATE') { %>
+            <td>₹<%= g.cgst.toFixed(2) %></td>
+            <td>₹<%= g.sgst.toFixed(2) %></td>
+          <% } else { %>
+            <td>₹<%= g.igst.toFixed(2) %></td>
+          <% } %>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <div class="totals-row">
+    <div class="totals-box">
+      <div class="line"><span>Subtotal</span><span>₹<%= Number(invoice.subtotal).toFixed(2) %></span></div>
+      <div class="line"><span>Discount</span><span>- ₹<%= Number(invoice.discount).toFixed(2) %></span></div>
+      <div class="line"><span>Taxable Amount</span><span>₹<%= Number(invoice.taxableAmount).toFixed(2) %></span></div>
+      <div class="line"><span>Total Tax</span><span>₹<%= (Number(invoice.cgst) + Number(invoice.sgst) + Number(invoice.igst) + Number(invoice.cess)).toFixed(2) %></span></div>
+      <div class="line"><span>Round Off</span><span>₹<%= Number(invoice.roundOff).toFixed(2) %></span></div>
+      <div class="line grand"><span>GRAND TOTAL</span><span>₹<%= Number(invoice.total).toFixed(2) %></span></div>
+    </div>
+  </div>
+
+  <div class="words-row"><strong>Amount in Words:</strong> <%= amountInWords %></div>
+
+  <div class="status-line">
+    Payment Status:
+    <span style="color: <%= invoice.paymentStatus === 'PAID' ? '#16a34a' : (invoice.paymentStatus === 'PARTIALLY_PAID' ? '#b45309' : '#dc2626') %>;">
+      <%= invoice.paymentStatus.replace('_', ' ') %>
+    </span>
+  </div>
+
+  <div class="words-row" style="font-size: 11px; color: #6b7280;">
+    Terms &amp; Conditions: Goods once sold will not be taken back. Subject to local jurisdiction.
+  </div>
+
+  <div class="footer-row">
+    <div></div>
+    <div class="sign-box">Authorized Signature</div>
+  </div>
+</div>

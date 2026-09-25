@@ -1,0 +1,57 @@
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <% if (typeof business !== 'undefined' && business && business.logoPath) { %>
+      <img src="<%= business.logoPath %>" alt="Logo" class="sidebar-logo" />
+    <% } else { %>
+      <div class="sidebar-logo-placeholder"><i class="lucide-receipt"></i></div>
+    <% } %>
+    <span class="sidebar-brand-name"><%= typeof business !== 'undefined' && business ? business.name : 'BillEasy GST' %></span>
+    <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Collapse sidebar">
+      <i class="lucide-chevrons-left"></i>
+    </button>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a href="/dashboard" class="nav-link <%= activeNav === 'dashboard' ? 'active' : '' %>">
+      <i class="lucide-home"></i><span>Home</span>
+    </a>
+
+    <div class="nav-group-label">Parties</div>
+    <a href="/customers" class="nav-link <%= activeNav === 'customers' ? 'active' : '' %>">
+      <i class="lucide-users"></i><span>Customers</span>
+    </a>
+
+    <div class="nav-group-label">Items</div>
+    <a href="/products" class="nav-link <%= activeNav === 'products' ? 'active' : '' %>">
+      <i class="lucide-package"></i><span>Products</span>
+    </a>
+
+    <div class="nav-group-label">Sale</div>
+    <a href="/invoices" class="nav-link <%= activeNav === 'invoices' ? 'active' : '' %>">
+      <i class="lucide-file-text"></i><span>Sale Invoices</span>
+    </a>
+
+    <div class="nav-group-label">Settings</div>
+    <a href="/settings/tax-master" class="nav-link <%= activeNav === 'tax-master' ? 'active' : '' %>">
+      <i class="lucide-percent"></i><span>Tax Master</span>
+    </a>
+    <a href="/settings/hsn-master" class="nav-link <%= activeNav === 'hsn-master' ? 'active' : '' %>">
+      <i class="lucide-list-tree"></i><span>HSN Master</span>
+    </a>
+    <a href="/business/setup" class="nav-link <%= activeNav === 'business' ? 'active' : '' %>">
+      <i class="lucide-building-2"></i><span>Business Profile</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-footer-business">
+      <i class="lucide-building"></i>
+      <span><%= typeof business !== 'undefined' && business ? business.name : 'No business' %></span>
+    </div>
+    <form action="/logout" method="POST" class="sidebar-footer-user">
+      <i class="lucide-user"></i>
+      <span><%= typeof userName !== 'undefined' ? userName : '' %></span>
+      <button type="submit" class="btn-logout" title="Log out"><i class="lucide-log-out"></i></button>
+    </form>
+  </div>
+</aside>

@@ -1,0 +1,59 @@
+<%- include('../partials/layout-start', { title: 'Invoice ' + invoice.invoiceNo, activeNav: 'invoices' }) %>
+
+<div class="d-flex justify-content-between align-items-center mb-3 no-print">
+  <div>
+    <h5 class="fw-bold mb-0">Invoice <%= invoice.invoiceNo %></h5>
+    <span class="status-badge <%= invoice.paymentStatus === 'PAID' ? 'status-paid' : (invoice.paymentStatus === 'PARTIALLY_PAID' ? 'status-partial' : 'status-unpaid') %>">
+      <%= invoice.paymentStatus.replace('_',' ') %>
+    </span>
+  </div>
+  <div class="d-flex gap-2" data-shortcut-print>
+    <% if (invoice.balance > 0) { %>
+      <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#paymentModal">Record Payment</button>
+    <% } %>
+    <button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="lucide-printer"></i> Print (Ctrl+P)</button>
+    <a href="/invoices/<%= invoice.id %>/pdf" class="btn btn-primary-app"><i class="lucide-download"></i> Download PDF</a>
+  </div>
+</div>
+
+<div class="card">
+  <%- include('_invoice-document') %>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal fade no-print" id="paymentModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/invoices/<%= invoice.id %>/payment">
+        <div class="modal-header">
+          <h6 class="modal-title fw-bold">Record Payment</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Amount</label>
+            <input type="number" name="amount" class="form-control" min="0.01" step="0.01" max="<%= invoice.balance %>" value="<%= invoice.balance %>" required>
+            <div class="form-text">Balance due: ₹<%= Number(invoice.balance).toFixed(2) %></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Payment Type</label>
+            <select name="type" class="form-select">
+              <option value="CASH">Cash</option>
+              <option value="UPI">UPI</option>
+              <option value="BANK_TRANSFER">Bank Transfer</option>
+              <option value="CARD">Card</option>
+              <option value="CREDIT">Credit</option>
+              <option value="OTHER">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary-app">Save Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/layout-end') %>

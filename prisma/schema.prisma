@@ -1,0 +1,349 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CustomerType {
+  REGISTERED
+  UNREGISTERED
+  CONSUMER
+}
+
+enum PriceType {
+  INCLUSIVE
+  EXCLUSIVE
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum TaxType {
+  INTRA_STATE
+  INTER_STATE
+}
+
+enum PaymentStatus {
+  PAID
+  PARTIALLY_PAID
+  UNPAID
+}
+
+enum PaymentType {
+  CASH
+  UPI
+  BANK_TRANSFER
+  CARD
+  CREDIT
+  OTHER
+}
+
+enum RoundOffMode {
+  AUTOMATIC
+  MANUAL
+  DISABLED
+}
+
+enum NegativeStockPolicy {
+  PREVENT
+  ALLOW_WITH_WARNING
+}
+
+enum InvoiceStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum StockTransactionType {
+  OPENING
+  SALE
+  PURCHASE
+  ADJUSTMENT
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  businesses   Business[]
+}
+
+model Business {
+  id             String   @id @default(uuid())
+  ownerId        String
+  owner          User     @relation(fields: [ownerId], references: [id])
+  name           String
+  tradeName      String?
+  logoPath       String?
+  gstin          String?
+  pan            String?
+  businessType   String?
+  phone          String?
+  email          String?
+  address        String?
+  city           String?
+  state          String
+  pincode        String?
+  country        String   @default("India")
+  gstRegistered  Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  settings       BusinessSettings?
+  customers      Customer[]
+  categories     Category[]
+  units          Unit[]
+  products       Product[]
+  taxes          TaxMaster[]
+  hsnCodes       HSNMaster[]
+  invoices       SaleInvoice[]
+  invoiceSequences InvoiceSequence[]
+}
+
+model BusinessSettings {
+  id                  String              @id @default(uuid())
+  businessId          String              @unique
+  business            Business            @relation(fields: [businessId], references: [id])
+  invoicePrefix       String              @default("INV-")
+  invoiceStartNumber  Int                 @default(1)
+  financialYearFormat Boolean             @default(false)
+  roundOffMode        RoundOffMode        @default(AUTOMATIC)
+  negativeStockPolicy NegativeStockPolicy @default(ALLOW_WITH_WARNING)
+  updatedAt           DateTime            @updatedAt
+}
+
+model Customer {
+  id               String       @id @default(uuid())
+  businessId       String
+  business         Business     @relation(fields: [businessId], references: [id])
+  name             String
+  phone            String?
+  email            String?
+  gstin            String?
+  pan              String?
+  billingAddress   String?
+  shippingAddress  String?
+  state            String
+  pincode          String?
+  customerType     CustomerType @default(CONSUMER)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  invoices         SaleInvoice[]
+
+  @@index([businessId, name])
+}
+
+model Category {
+  id         String    @id @default(uuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id])
+  name       String
+  products   Product[]
+
+  @@unique([businessId, name])
+}
+
+model Unit {
+  id         String    @id @default(uuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id])
+  name       String
+  shortName  String
+  products   Product[]
+
+  @@unique([businessId, name])
+}
+
+model Product {
+  id               String        @id @default(uuid())
+  businessId       String
+  business         Business      @relation(fields: [businessId], references: [id])
+  name             String
+  itemCode         String?
+  barcode          String?
+  isService        Boolean       @default(false)
+
+  hsnCode          String?
+  categoryId       String?
+  category         Category?     @relation(fields: [categoryId], references: [id])
+  unitId           String?
+  unit             Unit?         @relation(fields: [unitId], references: [id])
+
+  salePrice        Decimal       @db.Decimal(12, 2)
+  purchasePrice    Decimal?      @db.Decimal(12, 2)
+  priceType        PriceType     @default(EXCLUSIVE)
+
+  taxId            String?
+  tax              TaxMaster?    @relation(fields: [taxId], references: [id])
+
+  defaultDiscount     Decimal?    @db.Decimal(12, 2)
+  defaultDiscountType DiscountType @default(PERCENTAGE)
+
+  openingStock     Decimal       @default(0) @db.Decimal(12, 2)
+  minStock         Decimal       @default(0) @db.Decimal(12, 2)
+  currentStock     Decimal       @default(0) @db.Decimal(12, 2)
+
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  invoiceItems     SaleInvoiceItem[]
+  stockTransactions StockTransaction[]
+
+  @@index([businessId, name])
+  @@index([businessId, itemCode])
+  @@index([businessId, hsnCode])
+}
+
+model HSNMaster {
+  id             String    @id @default(uuid())
+  businessId     String?
+  business       Business? @relation(fields: [businessId], references: [id])
+  hsnCode        String
+  description    String
+  chapter        String?
+  heading        String?
+  subHeading     String?
+  keywords       String?
+  gstRate        Decimal   @db.Decimal(5, 2)
+  effectiveFrom  DateTime?
+  effectiveTo    DateTime?
+  isActive       Boolean   @default(true)
+
+  @@index([hsnCode])
+  @@index([description])
+  @@index([keywords])
+}
+
+model TaxMaster {
+  id            String    @id @default(uuid())
+  businessId    String
+  business      Business  @relation(fields: [businessId], references: [id])
+  name          String
+  taxType       String    @default("GST")
+  rate          Decimal   @db.Decimal(5, 2)
+  cgstRate      Decimal   @db.Decimal(5, 2)
+  sgstRate      Decimal   @db.Decimal(5, 2)
+  igstRate      Decimal   @db.Decimal(5, 2)
+  cessRate      Decimal   @default(0) @db.Decimal(5, 2)
+  isActive      Boolean   @default(true)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+
+  products      Product[]
+
+  @@unique([businessId, rate])
+}
+
+model InvoiceSequence {
+  id             String   @id @default(uuid())
+  businessId     String
+  business       Business @relation(fields: [businessId], references: [id])
+  prefix         String
+  // Empty string (not null) when financial-year numbering is off, so the composite unique
+  // constraint below reliably finds the same row across calls (Postgres treats NULL as
+  // distinct from itself in unique constraints, which would otherwise create duplicate rows).
+  financialYear  String   @default("")
+  lastNumber     Int      @default(0)
+
+  @@unique([businessId, prefix, financialYear])
+}
+
+model SaleInvoice {
+  id              String        @id @default(uuid())
+  businessId      String
+  business        Business      @relation(fields: [businessId], references: [id])
+  customerId      String
+  customer        Customer      @relation(fields: [customerId], references: [id])
+
+  invoiceNo       String
+  invoiceDate     DateTime      @default(now())
+  dueDate         DateTime?
+  placeOfSupply   String
+  taxType         TaxType
+
+  subtotal        Decimal       @db.Decimal(12, 2)
+  discount        Decimal       @default(0) @db.Decimal(12, 2)
+  taxableAmount   Decimal       @db.Decimal(12, 2)
+  cgst            Decimal       @default(0) @db.Decimal(12, 2)
+  sgst            Decimal       @default(0) @db.Decimal(12, 2)
+  igst            Decimal       @default(0) @db.Decimal(12, 2)
+  cess            Decimal       @default(0) @db.Decimal(12, 2)
+  roundOff        Decimal       @default(0) @db.Decimal(12, 2)
+  total           Decimal       @db.Decimal(12, 2)
+
+  receivedAmount  Decimal       @default(0) @db.Decimal(12, 2)
+  balance         Decimal       @default(0) @db.Decimal(12, 2)
+  paymentStatus   PaymentStatus @default(UNPAID)
+  status          InvoiceStatus @default(ACTIVE)
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  items           SaleInvoiceItem[]
+  payments        Payment[]
+  stockTransactions StockTransaction[]
+
+  @@unique([businessId, invoiceNo])
+  @@index([businessId, invoiceDate])
+  @@index([businessId, paymentStatus])
+}
+
+model SaleInvoiceItem {
+  id             String      @id @default(uuid())
+  invoiceId      String
+  invoice        SaleInvoice @relation(fields: [invoiceId], references: [id])
+  productId      String?
+  product        Product?    @relation(fields: [productId], references: [id])
+
+  // Snapshot fields — frozen at time of sale, never recomputed from live Product later
+  productName    String
+  hsn            String?
+  unit           String?
+  quantity       Decimal     @db.Decimal(12, 2)
+  rate           Decimal     @db.Decimal(12, 2)
+  discount       Decimal     @default(0) @db.Decimal(12, 2)
+  discountType   DiscountType @default(PERCENTAGE)
+  taxRate        Decimal     @db.Decimal(5, 2)
+  taxableAmount  Decimal     @db.Decimal(12, 2)
+  cgst           Decimal     @default(0) @db.Decimal(12, 2)
+  sgst           Decimal     @default(0) @db.Decimal(12, 2)
+  igst           Decimal     @default(0) @db.Decimal(12, 2)
+  finalAmount    Decimal     @db.Decimal(12, 2)
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id         String      @id @default(uuid())
+  invoiceId  String
+  invoice    SaleInvoice @relation(fields: [invoiceId], references: [id])
+  amount     Decimal     @db.Decimal(12, 2)
+  type       PaymentType @default(CASH)
+  date       DateTime    @default(now())
+
+  @@index([invoiceId])
+}
+
+model StockTransaction {
+  id                String              @id @default(uuid())
+  productId         String
+  product           Product             @relation(fields: [productId], references: [id])
+  type              StockTransactionType
+  quantity          Decimal             @db.Decimal(12, 2)
+  resultingStock    Decimal             @db.Decimal(12, 2)
+  referenceInvoiceId String?
+  referenceInvoice  SaleInvoice?        @relation(fields: [referenceInvoiceId], references: [id])
+  note              String?
+  date              DateTime            @default(now())
+
+  @@index([productId, date])
+}

@@ -1,0 +1,161 @@
+<%- include('../partials/layout-start', { title: product && product.id ? 'Edit Item' : 'Add Item', activeNav: 'products' }) %>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card p-4">
+      <h5 class="fw-bold mb-3"><%= product && product.id ? 'Edit Item' : 'Add Item' %></h5>
+
+      <% if (errors && errors.length) { %>
+        <div class="alert alert-danger py-2 small">
+          <ul class="mb-0 ps-3"><% errors.forEach(function(e) { %><li><%= e %></li><% }) %></ul>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= product && product.id ? '/products/' + product.id : '/products' %>">
+        <div class="btn-group mb-3" role="group">
+          <input type="radio" class="btn-check" name="itemType" id="typeProduct" value="PRODUCT" <%= (!product || !product.isService) ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="typeProduct">Product</label>
+          <input type="radio" class="btn-check" name="itemType" id="typeService" value="SERVICE" <%= (product && product.isService) ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="typeService">Service</label>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label small fw-semibold">Item Name *</label>
+            <input type="text" id="itemName" name="name" class="form-control" required value="<%= product ? product.name || '' : '' %>">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Item Code</label>
+            <input type="text" name="itemCode" class="form-control" value="<%= product ? product.itemCode || '' : '' %>">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Barcode</label>
+            <input type="text" name="barcode" class="form-control" value="<%= product ? product.barcode || '' : '' %>">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">HSN Code</label>
+            <input type="text" id="hsnCode" name="hsnCode" class="form-control" value="<%= product ? product.hsnCode || '' : '' %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Category</label>
+            <input type="text" name="categoryName" class="form-control" list="categoryList" value="<%= product && product.category ? product.category.name : '' %>">
+            <datalist id="categoryList">
+              <% categories.forEach(function(c) { %><option value="<%= c.name %>"><% }) %>
+            </datalist>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Unit *</label>
+            <input type="text" name="unitName" class="form-control" list="unitList" required value="<%= product && product.unit ? product.unit.name : '' %>">
+            <datalist id="unitList">
+              <% units.forEach(function(u) { %><option value="<%= u.name %>"><% }) %>
+            </datalist>
+          </div>
+
+          <div id="hsnSuggestions" class="col-12"></div>
+        </div>
+
+        <div class="form-section-title">Pricing</div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Sale Price *</label>
+            <input type="number" name="salePrice" class="form-control" step="0.01" min="0" required value="<%= product ? product.salePrice || '' : '' %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Purchase Price</label>
+            <input type="number" name="purchasePrice" class="form-control" step="0.01" min="0" value="<%= product ? product.purchasePrice || '' : '' %>">
+          </div>
+        </div>
+
+        <div class="form-section-title">Tax</div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">GST Rate</label>
+            <select id="gstRateSelect" name="taxId" class="form-select">
+              <option value="">No GST</option>
+              <% taxes.forEach(function(t) { %>
+                <option value="<%= t.id %>" data-rate="<%= t.rate %>" <%= product && product.taxId === t.id ? 'selected' : '' %>><%= t.name %> (<%= t.rate %>%)</option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Price Type</label>
+            <select name="priceType" class="form-select">
+              <option value="EXCLUSIVE" <%= (!product || product.priceType === 'EXCLUSIVE') ? 'selected' : '' %>>Without Tax (Exclusive)</option>
+              <option value="INCLUSIVE" <%= (product && product.priceType === 'INCLUSIVE') ? 'selected' : '' %>>With Tax (Inclusive)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-section-title">Stock</div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Opening Stock</label>
+            <input type="number" name="openingStock" class="form-control" step="0.01" min="0" value="<%= product ? product.openingStock || 0 : 0 %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Minimum Stock</label>
+            <input type="number" name="minStock" class="form-control" step="0.01" min="0" value="<%= product ? product.minStock || 0 : 0 %>">
+          </div>
+        </div>
+
+        <div class="form-section-title">Default Discount</div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Discount Value</label>
+            <input type="number" name="defaultDiscount" class="form-control" step="0.01" min="0" value="<%= product ? product.defaultDiscount || 0 : 0 %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Discount Type</label>
+            <select name="defaultDiscountType" class="form-select">
+              <option value="PERCENTAGE" <%= (!product || product.defaultDiscountType === 'PERCENTAGE') ? 'selected' : '' %>>Percentage</option>
+              <option value="FIXED" <%= (product && product.defaultDiscountType === 'FIXED') ? 'selected' : '' %>>Fixed Amount</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+          <button type="submit" class="btn btn-primary-app px-4" data-shortcut-save>Save Item</button>
+          <a href="/products" class="btn btn-outline-secondary px-4">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <% if (product && product.id) { %>
+      <div class="card p-3 mb-3">
+        <div class="stat-label text-muted small">Current Stock</div>
+        <div class="stat-value fs-3 fw-bold"><%= Number(product.currentStock) %></div>
+      </div>
+      <div class="card p-3">
+        <h6 class="fw-bold small text-uppercase text-muted mb-3">Transaction History</h6>
+        <% if (!stockTransactions || stockTransactions.length === 0) { %>
+          <div class="text-muted small">No transactions yet.</div>
+        <% } else { %>
+          <% stockTransactions.forEach(function(t) { %>
+            <div class="d-flex justify-content-between border-bottom py-2 small">
+              <div>
+                <div class="fw-semibold"><%= t.type %><%= t.referenceInvoice ? ' · ' + t.referenceInvoice.invoiceNo : '' %></div>
+                <div class="text-muted"><%= new Date(t.date).toLocaleDateString('en-IN') %><%= t.referenceInvoice ? ' · ' + t.referenceInvoice.customer.name : '' %></div>
+              </div>
+              <div class="text-end">
+                <div class="<%= Number(t.quantity) < 0 ? 'text-danger' : 'text-success' %>"><%= Number(t.quantity) > 0 ? '+' : '' %><%= Number(t.quantity) %></div>
+                <div class="text-muted">Bal: <%= Number(t.resultingStock) %></div>
+              </div>
+            </div>
+          <% }) %>
+        <% } %>
+      </div>
+    <% } else { %>
+      <div class="card p-3">
+        <div class="text-muted small">
+          <i class="lucide-info"></i>
+          Start typing the item name to get HSN code suggestions from your HSN Master.
+        </div>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<script src="/js/hsn-suggest.js"></script>
+<%- include('../partials/layout-end') %>

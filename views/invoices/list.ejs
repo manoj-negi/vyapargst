@@ -1,0 +1,111 @@
+<%- include('../partials/layout-start', { title: 'Sale Invoices', activeNav: 'invoices' }) %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="fw-bold mb-0">Sale Invoices</h5>
+  <a href="/invoices/new" class="btn btn-accent"><i class="lucide-plus"></i> Add Sale</a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">Total Sales</div>
+      <div class="stat-value">₹<%= summary.totalSales.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">Received</div>
+      <div class="stat-value text-success">₹<%= summary.received.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">Outstanding</div>
+      <div class="stat-value text-danger">₹<%= summary.outstanding.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">Invoices</div>
+      <div class="stat-value"><%= invoiceCount %></div>
+    </div>
+  </div>
+</div>
+
+<div class="card p-3 mb-3">
+  <form method="GET" action="/invoices" class="row g-2 align-items-end">
+    <div class="col-md-2">
+      <label class="form-label small fw-semibold mb-1">From</label>
+      <input type="date" name="from" class="form-control form-control-sm" value="<%= filters.from %>">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small fw-semibold mb-1">To</label>
+      <input type="date" name="to" class="form-control form-control-sm" value="<%= filters.to %>">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small fw-semibold mb-1">Customer</label>
+      <select name="customerId" class="form-select form-select-sm">
+        <option value="">All Customers</option>
+        <% customers.forEach(function(c) { %>
+          <option value="<%= c.id %>" <%= filters.customerId === c.id ? 'selected' : '' %>><%= c.name %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small fw-semibold mb-1">Payment Status</label>
+      <select name="paymentStatus" class="form-select form-select-sm">
+        <option value="">All</option>
+        <option value="PAID" <%= filters.paymentStatus === 'PAID' ? 'selected' : '' %>>Paid</option>
+        <option value="PARTIALLY_PAID" <%= filters.paymentStatus === 'PARTIALLY_PAID' ? 'selected' : '' %>>Partially Paid</option>
+        <option value="UNPAID" <%= filters.paymentStatus === 'UNPAID' ? 'selected' : '' %>>Unpaid</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small fw-semibold mb-1">Invoice No.</label>
+      <input type="text" name="invoiceNo" class="form-control form-control-sm" value="<%= filters.invoiceNo %>">
+    </div>
+    <div class="col-md-1">
+      <button type="submit" class="btn btn-sm btn-primary-app w-100">Filter</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="table-scroll">
+    <table class="table table-app mb-0">
+      <thead>
+        <tr><th>Date</th><th>Invoice No</th><th>Customer</th><th>Amount</th><th>Received</th><th>Balance</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% if (invoices.length === 0) { %>
+          <tr><td colspan="8">
+            <div class="empty-state">
+              <i class="lucide-file-text"></i>
+              No invoices yet. <a href="/invoices/new">Create your first sale invoice</a>.
+            </div>
+          </td></tr>
+        <% } %>
+        <% invoices.forEach(function(inv) { %>
+          <tr>
+            <td><%= new Date(inv.invoiceDate).toLocaleDateString('en-IN') %></td>
+            <td><a href="/invoices/<%= inv.id %>" class="fw-semibold"><%= inv.invoiceNo %></a></td>
+            <td><%= inv.customer.name %></td>
+            <td>₹<%= Number(inv.total).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></td>
+            <td>₹<%= Number(inv.receivedAmount).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></td>
+            <td>₹<%= Number(inv.balance).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></td>
+            <td>
+              <% var cls = inv.paymentStatus === 'PAID' ? 'status-paid' : (inv.paymentStatus === 'PARTIALLY_PAID' ? 'status-partial' : 'status-unpaid'); %>
+              <span class="status-badge <%= cls %>"><%= inv.paymentStatus.replace('_',' ') %></span>
+            </td>
+            <td class="d-flex gap-1">
+              <a href="/invoices/<%= inv.id %>" class="btn btn-sm btn-outline-secondary">View</a>
+              <a href="/invoices/<%= inv.id %>/pdf" class="btn btn-sm btn-outline-secondary">PDF</a>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('../partials/layout-end') %>

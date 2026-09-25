@@ -1,0 +1,74 @@
+<%- include('../partials/layout-start', { title: 'HSN Master', activeNav: 'hsn-master' }) %>
+
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3">Add HSN Code</h6>
+      <form method="POST" action="/settings/hsn-master">
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">HSN Code</label>
+          <input type="text" name="hsnCode" class="form-control" placeholder="e.g. 48025690" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Description</label>
+          <input type="text" name="description" class="form-control" placeholder="Paper and paperboard..." required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Keywords</label>
+          <input type="text" name="keywords" class="form-control" placeholder="paper, a4, copier, writing">
+          <div class="form-text">Comma-separated words used to match product names.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">GST Rate (%)</label>
+          <input type="number" name="gstRate" class="form-control" step="0.01" min="0" max="100" required>
+        </div>
+        <button type="submit" class="btn btn-primary-app w-100">Add HSN Code</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="p-3 border-bottom">
+        <form method="GET" action="/settings/hsn-master" class="d-flex gap-2">
+          <input type="text" name="q" class="form-control form-control-sm" placeholder="Search HSN code, description or keywords" value="<%= search %>">
+          <button type="submit" class="btn btn-sm btn-outline-secondary">Search</button>
+        </form>
+      </div>
+      <div class="table-scroll">
+        <table class="table table-app mb-0">
+          <thead>
+            <tr><th>HSN</th><th>Description</th><th>Keywords</th><th>GST%</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody>
+            <% if (hsnCodes.length === 0) { %>
+              <tr><td colspan="6" class="empty-state">No HSN codes found.</td></tr>
+            <% } %>
+            <% hsnCodes.forEach(function(h) { %>
+              <tr>
+                <td><strong><%= h.hsnCode %></strong></td>
+                <td><%= h.description %></td>
+                <td class="text-muted small"><%= h.keywords || '-' %></td>
+                <td><%= h.gstRate %>%</td>
+                <td>
+                  <span class="status-badge <%= h.isActive ? 'status-paid' : 'status-unpaid' %>">
+                    <%= h.isActive ? 'Active' : 'Inactive' %>
+                  </span>
+                </td>
+                <td>
+                  <form method="POST" action="/settings/hsn-master/<%= h.id %>/toggle">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">
+                      <%= h.isActive ? 'Disable' : 'Enable' %>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/layout-end') %>

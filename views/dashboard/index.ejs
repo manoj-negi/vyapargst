@@ -1,0 +1,76 @@
+<%- include('../partials/layout-start', { title: 'Dashboard', activeNav: 'dashboard' }) %>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4 col-lg">
+    <div class="stat-card">
+      <div class="stat-label">Today's Sales</div>
+      <div class="stat-value">₹<%= stats.todaySales.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg">
+    <div class="stat-card">
+      <div class="stat-label">This Month</div>
+      <div class="stat-value">₹<%= stats.monthSales.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg">
+    <div class="stat-card">
+      <div class="stat-label">Outstanding</div>
+      <div class="stat-value text-danger">₹<%= stats.outstanding.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg">
+    <div class="stat-card">
+      <div class="stat-label">Total Items</div>
+      <div class="stat-value"><%= stats.totalItems %></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg">
+    <div class="stat-card">
+      <div class="stat-label">Low Stock</div>
+      <div class="stat-value <%= stats.lowStock > 0 ? 'text-danger' : '' %>"><%= stats.lowStock %></div>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex gap-2 mb-4">
+  <a href="/invoices/new" class="btn btn-accent"><i class="lucide-plus"></i> Add Sale</a>
+  <a href="/products/new" class="btn btn-outline-primary"><i class="lucide-plus"></i> Add Item</a>
+  <a href="/customers/new" class="btn btn-outline-primary"><i class="lucide-plus"></i> Add Customer</a>
+</div>
+
+<div class="card">
+  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+    <h6 class="fw-bold mb-0">Recent Sales</h6>
+    <a href="/invoices" class="small">View all</a>
+  </div>
+  <div class="table-scroll">
+    <table class="table table-app mb-0">
+      <thead><tr><th>Invoice</th><th>Customer</th><th>Date</th><th>Amount</th><th>Payment Status</th></tr></thead>
+      <tbody>
+        <% if (recentInvoices.length === 0) { %>
+          <tr><td colspan="5">
+            <div class="empty-state">
+              <i class="lucide-file-text"></i>
+              No sales yet. <a href="/invoices/new">Create your first invoice</a>.
+            </div>
+          </td></tr>
+        <% } %>
+        <% recentInvoices.forEach(function(inv) { %>
+          <tr>
+            <td><a href="/invoices/<%= inv.id %>" class="fw-semibold"><%= inv.invoiceNo %></a></td>
+            <td><%= inv.customer.name %></td>
+            <td><%= new Date(inv.invoiceDate).toLocaleDateString('en-IN') %></td>
+            <td>₹<%= Number(inv.total).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></td>
+            <td>
+              <% var cls = inv.paymentStatus === 'PAID' ? 'status-paid' : (inv.paymentStatus === 'PARTIALLY_PAID' ? 'status-partial' : 'status-unpaid'); %>
+              <span class="status-badge <%= cls %>"><%= inv.paymentStatus.replace('_',' ') %></span>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('../partials/layout-end') %>

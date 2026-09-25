@@ -1,0 +1,68 @@
+<%- include('../partials/layout-start', { title: 'Tax Master', activeNav: 'tax-master' }) %>
+
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3">Add Tax Rate</h6>
+      <form method="POST" action="/settings/tax-master">
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Name</label>
+          <input type="text" name="name" class="form-control" placeholder="e.g. GST 18%" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">GST Rate (%)</label>
+          <input type="number" name="rate" class="form-control" step="0.01" min="0" max="100" required>
+          <div class="form-text">Automatically split into CGST + SGST (half each) or used as-is for IGST.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Cess Rate (%)</label>
+          <input type="number" name="cessRate" class="form-control" step="0.01" min="0" max="100" value="0">
+        </div>
+        <button type="submit" class="btn btn-primary-app w-100">Add Tax Rate</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="table-scroll">
+        <table class="table table-app mb-0">
+          <thead>
+            <tr>
+              <th>Name</th><th>Rate</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Cess</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (taxes.length === 0) { %>
+              <tr><td colspan="8" class="empty-state">No tax rates configured yet.</td></tr>
+            <% } %>
+            <% taxes.forEach(function(t) { %>
+              <tr>
+                <td><%= t.name %></td>
+                <td><%= t.rate %>%</td>
+                <td><%= t.cgstRate %>%</td>
+                <td><%= t.sgstRate %>%</td>
+                <td><%= t.igstRate %>%</td>
+                <td><%= t.cessRate %>%</td>
+                <td>
+                  <span class="status-badge <%= t.isActive ? 'status-paid' : 'status-unpaid' %>">
+                    <%= t.isActive ? 'Active' : 'Inactive' %>
+                  </span>
+                </td>
+                <td>
+                  <form method="POST" action="/settings/tax-master/<%= t.id %>/toggle">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">
+                      <%= t.isActive ? 'Disable' : 'Enable' %>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/layout-end') %>
