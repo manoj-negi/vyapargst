@@ -17,30 +17,27 @@ export async function requireBusiness(req: Request, res: Response, next: NextFun
     return res.redirect("/login");
   }
 
-  let businessId = req.session.businessId;
-
-  if (!businessId) {
-    const business = await prisma.business.findFirst({
+  // Scoped to the owner so a stale session can never show another user's business;
+  // otherwise fall back to the user's first business.
+  const business =
+    (req.session.businessId
+      ? await prisma.business.findFirst({
+          where: { id: req.session.businessId, ownerId: req.session.userId },
+          include: { settings: true },
+        })
+      : null) ??
+    (await prisma.business.findFirst({
       where: { ownerId: req.session.userId },
       orderBy: { createdAt: "asc" },
-    });
-    if (!business) {
-      return res.redirect("/business/setup");
-    }
-    businessId = business.id;
-    req.session.businessId = businessId;
-  }
-
-  const business = await prisma.business.findUnique({
-    where: { id: businessId },
-    include: { settings: true },
-  });
+      include: { settings: true },
+    }));
 
   if (!business) {
     req.session.businessId = undefined;
     return res.redirect("/business/setup");
   }
 
+  req.session.businessId = business.id;
   res.locals.business = business;
   next();
 }

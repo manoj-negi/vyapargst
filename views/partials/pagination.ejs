@@ -1,0 +1,38 @@
+<%
+  // Expects: pagination = { page, totalPages, total, pageSize, query }, basePath
+  var p = pagination;
+  function pageUrl(n) {
+    var params = new URLSearchParams(Object.assign({}, p.query, { page: n }));
+    return basePath + '?' + params.toString();
+  }
+  var from = p.total === 0 ? 0 : (p.page - 1) * p.pageSize + 1;
+  var to = Math.min(p.page * p.pageSize, p.total);
+  // Window of page numbers around the current page, with first/last always shown.
+  var pages = [];
+  for (var n = 1; n <= p.totalPages; n++) {
+    if (n === 1 || n === p.totalPages || Math.abs(n - p.page) <= 2) pages.push(n);
+    else if (pages[pages.length - 1] !== '…') pages.push('…');
+  }
+%>
+<div class="d-flex justify-content-between align-items-center p-3 border-top">
+  <div class="text-muted small">Showing <%= from %>–<%= to %> of <%= p.total %></div>
+  <% if (p.totalPages > 1) { %>
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        <li class="page-item <%= p.page === 1 ? 'disabled' : '' %>">
+          <a class="page-link" href="<%= pageUrl(p.page - 1) %>">Previous</a>
+        </li>
+        <% pages.forEach(function(n) { %>
+          <% if (n === '…') { %>
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          <% } else { %>
+            <li class="page-item <%= n === p.page ? 'active' : '' %>"><a class="page-link" href="<%= pageUrl(n) %>"><%= n %></a></li>
+          <% } %>
+        <% }) %>
+        <li class="page-item <%= p.page === p.totalPages ? 'disabled' : '' %>">
+          <a class="page-link" href="<%= pageUrl(p.page + 1) %>">Next</a>
+        </li>
+      </ul>
+    </nav>
+  <% } %>
+</div>

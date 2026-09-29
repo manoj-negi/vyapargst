@@ -1,74 +1,138 @@
 <%- include('../partials/layout-start', { title: 'HSN Master', activeNav: 'hsn-master' }) %>
 
-<div class="row g-4">
-  <div class="col-lg-4">
-    <div class="card p-4">
-      <h6 class="fw-bold mb-3">Add HSN Code</h6>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <form method="GET" action="/settings/hsn-master" class="d-flex gap-2">
+    <input type="text" name="q" class="form-control form-control-sm" style="width: 320px" placeholder="Search HSN code, description or keywords" value="<%= search %>">
+    <button type="submit" class="btn btn-sm btn-outline-secondary">Search</button>
+  </form>
+  <button type="button" class="btn btn-accent" data-bs-toggle="modal" data-bs-target="#addHsnModal"><i class="icon-plus"></i> Add HSN Code</button>
+</div>
+
+<div class="card">
+  <div class="table-scroll">
+    <table class="table table-app mb-0">
+      <thead>
+        <tr><th>HSN</th><th>Description</th><th>Keywords</th><th>GST%</th><th>Status</th><th class="text-end">Actions</th></tr>
+      </thead>
+      <tbody>
+        <% if (hsnCodes.length === 0) { %>
+          <tr><td colspan="6" class="empty-state">No HSN codes found.</td></tr>
+        <% } %>
+        <% hsnCodes.forEach(function(h) { %>
+          <tr>
+            <td><strong><%= h.hsnCode %></strong></td>
+            <td><%= h.description %></td>
+            <td class="text-muted small"><%= h.keywords || '-' %></td>
+            <td><%= h.gstRate %>%</td>
+            <td>
+              <span class="status-badge <%= h.isActive ? 'status-paid' : 'status-unpaid' %>">
+                <%= h.isActive ? 'Active' : 'Inactive' %>
+              </span>
+            </td>
+            <td class="text-end text-nowrap">
+              <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editHsnModal"
+                      data-id="<%= h.id %>" data-hsn-code="<%= h.hsnCode %>" data-description="<%= h.description %>"
+                      data-keywords="<%= h.keywords || '' %>" data-gst-rate="<%= h.gstRate %>">Edit</button>
+              <form method="POST" action="/settings/hsn-master/<%= h.id %>/toggle" class="d-inline">
+                <input type="hidden" name="returnQ" value="<%= search %>"><input type="hidden" name="returnPage" value="<%= pagination.page %>">
+                <button type="submit" class="btn btn-sm btn-outline-secondary"><%= h.isActive ? 'Disable' : 'Enable' %></button>
+              </form>
+              <form method="POST" action="/settings/hsn-master/<%= h.id %>/delete" class="d-inline"
+                    onsubmit="return confirm('Delete HSN code <%= h.hsnCode %>? This cannot be undone.');">
+                <input type="hidden" name="returnQ" value="<%= search %>"><input type="hidden" name="returnPage" value="<%= pagination.page %>">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <%- include('../partials/pagination', { pagination: pagination, basePath: '/settings/hsn-master' }) %>
+</div>
+
+<div class="modal fade" id="addHsnModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
       <form method="POST" action="/settings/hsn-master">
-        <div class="mb-3">
-          <label class="form-label small fw-semibold">HSN Code</label>
-          <input type="text" name="hsnCode" class="form-control" placeholder="e.g. 48025690" required>
+        <div class="modal-header">
+          <h6 class="modal-title fw-bold">Add HSN Code</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-        <div class="mb-3">
-          <label class="form-label small fw-semibold">Description</label>
-          <input type="text" name="description" class="form-control" placeholder="Paper and paperboard..." required>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">HSN Code</label>
+            <input type="text" name="hsnCode" class="form-control" placeholder="e.g. 48025690" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Description</label>
+            <input type="text" name="description" class="form-control" placeholder="Paper and paperboard..." required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Keywords</label>
+            <input type="text" name="keywords" class="form-control" placeholder="paper, a4, copier, writing">
+            <div class="form-text">Comma-separated words used to match product names.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">GST Rate (%)</label>
+            <input type="number" name="gstRate" class="form-control" step="0.01" min="0" max="100" required>
+          </div>
         </div>
-        <div class="mb-3">
-          <label class="form-label small fw-semibold">Keywords</label>
-          <input type="text" name="keywords" class="form-control" placeholder="paper, a4, copier, writing">
-          <div class="form-text">Comma-separated words used to match product names.</div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary-app">Save HSN Code</button>
         </div>
-        <div class="mb-3">
-          <label class="form-label small fw-semibold">GST Rate (%)</label>
-          <input type="number" name="gstRate" class="form-control" step="0.01" min="0" max="100" required>
-        </div>
-        <button type="submit" class="btn btn-primary-app w-100">Add HSN Code</button>
       </form>
     </div>
   </div>
+</div>
 
-  <div class="col-lg-8">
-    <div class="card">
-      <div class="p-3 border-bottom">
-        <form method="GET" action="/settings/hsn-master" class="d-flex gap-2">
-          <input type="text" name="q" class="form-control form-control-sm" placeholder="Search HSN code, description or keywords" value="<%= search %>">
-          <button type="submit" class="btn btn-sm btn-outline-secondary">Search</button>
-        </form>
-      </div>
-      <div class="table-scroll">
-        <table class="table table-app mb-0">
-          <thead>
-            <tr><th>HSN</th><th>Description</th><th>Keywords</th><th>GST%</th><th>Status</th><th></th></tr>
-          </thead>
-          <tbody>
-            <% if (hsnCodes.length === 0) { %>
-              <tr><td colspan="6" class="empty-state">No HSN codes found.</td></tr>
-            <% } %>
-            <% hsnCodes.forEach(function(h) { %>
-              <tr>
-                <td><strong><%= h.hsnCode %></strong></td>
-                <td><%= h.description %></td>
-                <td class="text-muted small"><%= h.keywords || '-' %></td>
-                <td><%= h.gstRate %>%</td>
-                <td>
-                  <span class="status-badge <%= h.isActive ? 'status-paid' : 'status-unpaid' %>">
-                    <%= h.isActive ? 'Active' : 'Inactive' %>
-                  </span>
-                </td>
-                <td>
-                  <form method="POST" action="/settings/hsn-master/<%= h.id %>/toggle">
-                    <button type="submit" class="btn btn-sm btn-outline-secondary">
-                      <%= h.isActive ? 'Disable' : 'Enable' %>
-                    </button>
-                  </form>
-                </td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
+<div class="modal fade" id="editHsnModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" id="editHsnForm" action="">
+        <input type="hidden" name="returnQ" value="<%= search %>"><input type="hidden" name="returnPage" value="<%= pagination.page %>">
+        <div class="modal-header">
+          <h6 class="modal-title fw-bold">Edit HSN Code</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">HSN Code</label>
+            <input type="text" name="hsnCode" id="editHsnCode" class="form-control" placeholder="e.g. 48025690" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Description</label>
+            <input type="text" name="description" id="editDescription" class="form-control" placeholder="Paper and paperboard..." required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Keywords</label>
+            <input type="text" name="keywords" id="editKeywords" class="form-control" placeholder="paper, a4, copier, writing">
+            <div class="form-text">Comma-separated words used to match product names.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">GST Rate (%)</label>
+            <input type="number" name="gstRate" id="editGstRate" class="form-control" step="0.01" min="0" max="100" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary-app">Update HSN Code</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
+
+<script>
+  document.getElementById('editHsnModal').addEventListener('show.bs.modal', function (event) {
+    var d = event.relatedTarget.dataset;
+    document.getElementById('editHsnForm').action = '/settings/hsn-master/' + d.id;
+    document.getElementById('editHsnCode').value = d.hsnCode;
+    document.getElementById('editDescription').value = d.description;
+    document.getElementById('editKeywords').value = d.keywords;
+    document.getElementById('editGstRate').value = d.gstRate;
+  });
+</script>
 
 <%- include('../partials/layout-end') %>

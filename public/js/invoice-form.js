@@ -12,6 +12,8 @@
   const form = document.getElementById("invoiceForm");
   const showCgstSgstCols = document.querySelectorAll(".col-cgst-sgst");
   const showIgstCols = document.querySelectorAll(".col-igst");
+  const stickyTotalDisplay = document.getElementById("stickyTotalDisplay");
+  const itemCountDisplay = document.getElementById("itemCountDisplay");
 
   if (!tbody || !form) return;
 
@@ -39,10 +41,12 @@
   }
 
   function renumberRows() {
-    tbody.querySelectorAll("tr").forEach((row, i) => {
+    const rows = tbody.querySelectorAll("tr");
+    rows.forEach((row, i) => {
       const numCell = row.querySelector(".row-number");
       if (numCell) numCell.textContent = i + 1;
     });
+    if (itemCountDisplay) itemCountDisplay.textContent = `${rows.length} ${rows.length === 1 ? "item" : "items"}`;
   }
 
   function wireRow(row) {
@@ -68,6 +72,7 @@
           const res = await fetch(`/api/products/search?q=${encodeURIComponent(q)}`);
           if (!res.ok) return;
           const data = await res.json();
+          if (document.activeElement !== nameInput) return;
           renderAutocomplete(menu, row, data.results || []);
         } catch (err) {
           console.error("Product search failed", err);
@@ -91,7 +96,16 @@
     });
   }
 
+  // The menu is position: fixed so the table's scroll container can't clip it
+  function positionMenu(menu, input) {
+    const rect = input.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + 4}px`;
+    menu.style.left = `${rect.left}px`;
+    menu.style.width = `${Math.max(rect.width, 280)}px`;
+  }
+
   function renderAutocomplete(menu, row, results) {
+    positionMenu(menu, row.querySelector(".item-name-input"));
     if (results.length === 0) {
       menu.innerHTML = `<div class="autocomplete-item text-muted">No matching items</div>`;
       return;
@@ -228,6 +242,7 @@
     document.getElementById("cessDisplay").textContent = money(data.totals.cess);
     document.getElementById("roundOffDisplay").textContent = money(data.totals.roundOff);
     document.getElementById("grandTotalDisplay").textContent = money(data.totals.total);
+    if (stickyTotalDisplay) stickyTotalDisplay.textContent = money(data.totals.total);
     document.getElementById("grandTotalHidden").value = data.totals.total;
 
     updatePaymentStatus(data.totals.total);
@@ -237,6 +252,7 @@
     ["subtotalDisplay", "discountDisplay", "taxableDisplay", "cgstDisplay", "sgstDisplay", "igstDisplay", "cessDisplay", "roundOffDisplay", "grandTotalDisplay"].forEach(
       (id) => (document.getElementById(id).textContent = money(0))
     );
+    if (stickyTotalDisplay) stickyTotalDisplay.textContent = money(0);
     updatePaymentStatus(0);
   }
 
@@ -258,6 +274,17 @@
   }
 
   addRowBtn.addEventListener("click", () => addRow());
+
+  // A fixed menu would drift away from its input on scroll, so close it instead
+  window.addEventListener(
+    "scroll",
+    (e) => {
+      if (e.target instanceof Element && e.target.closest(".autocomplete-menu")) return;
+      tbody.querySelectorAll(".autocomplete-menu").forEach((m) => (m.innerHTML = ""));
+    },
+    true
+  );
+  window.addEventListener("resize", () => tbody.querySelectorAll(".autocomplete-menu").forEach((m) => (m.innerHTML = "")));
   customerSelect.addEventListener("change", scheduleRecalc);
   invoiceDiscountValue.addEventListener("input", scheduleRecalc);
   invoiceDiscountType.addEventListener("change", scheduleRecalc);

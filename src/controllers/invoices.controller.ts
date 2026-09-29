@@ -8,6 +8,7 @@ import { allocateInvoiceNumber } from "../services/invoice/numbering";
 import { deductStockForSale, restoreStockForCancelledSale } from "../services/stock/stockService";
 import { buildInvoiceViewModel } from "../services/invoice/invoiceView";
 import { renderInvoicePdf } from "../services/invoice/pdf";
+import { INDIAN_STATES } from "../lib/indianStates";
 
 const invoiceItemSchema = z.object({
   productId: z.string().trim().optional().or(z.literal("")),
@@ -87,6 +88,7 @@ export async function showNewInvoice(req: Request, res: Response) {
     activeNav: "invoices",
     invoice: null,
     customers,
+    states: INDIAN_STATES,
     errors: null,
   });
 }
@@ -102,6 +104,7 @@ export async function createInvoice(req: Request, res: Response) {
       activeNav: "invoices",
       invoice: null,
       customers,
+      states: INDIAN_STATES,
       errors: parsed.error.errors.map((e) => e.message),
     });
   }
@@ -238,7 +241,9 @@ export async function downloadInvoicePdf(req: Request, res: Response) {
   const pdfBuffer = await renderInvoicePdf(viewModel);
 
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${viewModel.invoice.invoiceNo}.pdf"`);
+  // e.g. Sale_103_05-08-2026.pdf
+  const fileName = `Sale_${viewModel.invoice.invoiceNo}_${viewModel.formatDate(viewModel.invoice.invoiceDate)}`.replace(/[^A-Za-z0-9_-]/g, "-");
+  res.setHeader("Content-Disposition", `attachment; filename="${fileName}.pdf"`);
   res.send(pdfBuffer);
 }
 

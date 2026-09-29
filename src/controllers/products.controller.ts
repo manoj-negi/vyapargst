@@ -3,6 +3,12 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { AppError } from "../middleware/errorHandler";
 import { toDecimal } from "../lib/decimal";
+import { STANDARD_UNITS, standardShortName } from "../lib/units";
+
+// Blank form inputs arrive as "" — treat them as "not provided" instead of coercing to 0.
+const blankToUndefined = (v: unknown) => (v === "" || v === null ? undefined : v);
+const optionalAmount = z.preprocess(blankToUndefined, z.coerce.number().min(0).optional());
+const priceTypeEnum = z.enum(["INCLUSIVE", "EXCLUSIVE"]).default("EXCLUSIVE");
 
 const productSchema = z.object({
   itemType: z.enum(["PRODUCT", "SERVICE"]).default("PRODUCT"),
@@ -12,15 +18,38 @@ const productSchema = z.object({
   hsnCode: z.string().trim().optional().or(z.literal("")),
   categoryName: z.string().trim().optional().or(z.literal("")),
   unitName: z.string().trim().min(1, "Unit is required"),
+  secondaryUnitName: z.string().trim().optional().or(z.literal("")),
+  conversionRate: z.preprocess(blankToUndefined, z.coerce.number().positive("Conversion rate must be greater than 0").optional()),
   salePrice: z.coerce.number().min(0, "Sale price must be 0 or more"),
+  priceType: priceTypeEnum,
   purchasePrice: z.coerce.number().min(0).optional(),
-  priceType: z.enum(["INCLUSIVE", "EXCLUSIVE"]).default("EXCLUSIVE"),
+  purchasePriceType: priceTypeEnum,
+  wholesalePrice: optionalAmount,
+  wholesalePriceType: priceTypeEnum,
+  minWholesaleQty: optionalAmount,
   taxId: z.string().trim().optional().or(z.literal("")),
   defaultDiscount: z.coerce.number().min(0).optional(),
   defaultDiscountType: z.enum(["PERCENTAGE", "FIXED"]).default("PERCENTAGE"),
   openingStock: z.coerce.number().min(0).default(0),
+  openingStockPrice: optionalAmount,
+  openingStockDate: z.preprocess(blankToUndefined, z.coerce.date().optional()),
+  stockLocation: z.string().trim().optional().or(z.literal("")),
   minStock: z.coerce.number().min(0).default(0),
+}).superRefine((data, ctx) => {
+  if (data.secondaryUnitName) {
+    if (data.secondaryUnitName === data.unitName) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Secondary unit must be different from the base unit" });
+    }
+    if (data.conversionRate === undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Conversion rate is required when a secondary unit is selected" });
+    }
+  }
+  if (data.wholesalePrice !== undefined && data.minWholesaleQty === undefined) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Minimum wholesale quantity is required when a wholesale price is set" });
+  }
 });
+
+type ProductInput = z.infer<typeof productSchema>;
 
 async function findOrCreateCategory(businessId: string, name: string) {
   if (!name) return null;
@@ -34,7 +63,7 @@ async function findOrCreateCategory(businessId: string, name: string) {
 async function findOrCreateUnit(businessId: string, name: string) {
   return prisma.unit.upsert({
     where: { businessId_name: { businessId, name } },
-    create: { businessId, name, shortName: name.slice(0, 8) },
+    create: { businessId, name, shortName: standardShortName(name) ?? name.slice(0, 8) },
     update: {},
   });
 }
@@ -45,7 +74,52 @@ async function loadFormOptions(businessId: string) {
     prisma.unit.findMany({ where: { businessId }, orderBy: { name: "asc" } }),
     prisma.taxMaster.findMany({ where: { businessId, isActive: true }, orderBy: { rate: "asc" } }),
   ]);
-  return { categories, units, taxes };
+  // Offer the standard unit list plus any custom units this business has created.
+  const unitOptions = [...STANDARD_UNITS];
+  for (const u of units) {
+    if (!unitOptions.some((o) => o.name === u.name)) unitOptions.push({ name: u.name, shortName: u.shortName });
+  }
+  return { categories, units: unitOptions, taxes };
+}
+
+async function buildProductData(businessId: string, data: ProductInput, imagePath: string | undefined) {
+  const [category, unit, secondaryUnit] = await Promise.all([
+    findOrCreateCategory(businessId, data.categoryName || ""),
+    findOrCreateUnit(businessId, data.unitName),
+    data.secondaryUnitName ? findOrCreateUnit(businessId, data.secondaryUnitName) : Promise.resolve(null),
+  ]);
+
+  return {
+    isService: data.itemType === "SERVICE",
+    name: data.name,
+    itemCode: data.itemCode || null,
+    barcode: data.barcode || null,
+    hsnCode: data.hsnCode || null,
+    ...(imagePath ? { imagePath } : {}),
+    categoryId: category?.id || null,
+    unitId: unit.id,
+    secondaryUnitId: secondaryUnit?.id || null,
+    conversionRate: secondaryUnit ? data.conversionRate ?? null : null,
+    salePrice: data.salePrice,
+    priceType: data.priceType,
+    purchasePrice: data.purchasePrice ?? null,
+    purchasePriceType: data.purchasePriceType,
+    wholesalePrice: data.wholesalePrice ?? null,
+    wholesalePriceType: data.wholesalePriceType,
+    minWholesaleQty: data.wholesalePrice !== undefined ? data.minWholesaleQty ?? null : null,
+    taxId: data.taxId || null,
+    defaultDiscount: data.defaultDiscount ?? 0,
+    defaultDiscountType: data.defaultDiscountType,
+    openingStock: data.openingStock,
+    openingStockPrice: data.openingStockPrice ?? null,
+    openingStockDate: data.openingStockDate ?? null,
+    stockLocation: data.stockLocation || null,
+    minStock: data.minStock,
+  };
+}
+
+function uploadedImagePath(req: Request) {
+  return req.file ? `/uploads/items/${req.file.filename}` : undefined;
 }
 
 export async function listProducts(req: Request, res: Response) {
@@ -102,7 +176,7 @@ export async function showEditProduct(req: Request, res: Response) {
   const business = res.locals.business;
   const product = await prisma.product.findFirst({
     where: { id: req.params.id, businessId: business.id },
-    include: { category: true, unit: true, tax: true },
+    include: { category: true, unit: true, secondaryUnit: true, tax: true },
   });
   if (!product) throw new AppError("Item not found", 404);
 
@@ -140,29 +214,12 @@ export async function createProduct(req: Request, res: Response) {
   }
 
   const data = parsed.data;
-  const [category, unit] = await Promise.all([
-    findOrCreateCategory(business.id, data.categoryName || ""),
-    findOrCreateUnit(business.id, data.unitName),
-  ]);
+  const productData = await buildProductData(business.id, data, uploadedImagePath(req));
 
   await prisma.product.create({
     data: {
       businessId: business.id,
-      isService: data.itemType === "SERVICE",
-      name: data.name,
-      itemCode: data.itemCode || null,
-      barcode: data.barcode || null,
-      hsnCode: data.hsnCode || null,
-      categoryId: category?.id || null,
-      unitId: unit.id,
-      salePrice: data.salePrice,
-      purchasePrice: data.purchasePrice ?? null,
-      priceType: data.priceType,
-      taxId: data.taxId || null,
-      defaultDiscount: data.defaultDiscount ?? 0,
-      defaultDiscountType: data.defaultDiscountType,
-      openingStock: data.openingStock,
-      minStock: data.minStock,
+      ...productData,
       currentStock: data.openingStock,
     },
   });
@@ -189,10 +246,7 @@ export async function updateProduct(req: Request, res: Response) {
   }
 
   const data = parsed.data;
-  const [category, unit] = await Promise.all([
-    findOrCreateCategory(business.id, data.categoryName || ""),
-    findOrCreateUnit(business.id, data.unitName),
-  ]);
+  const productData = await buildProductData(business.id, data, uploadedImagePath(req));
 
   // Opening stock is fixed at creation; only stock adjustments should change currentStock afterward.
   const stockDelta = toDecimal(data.openingStock).minus(toDecimal(existing.openingStock));
@@ -200,21 +254,7 @@ export async function updateProduct(req: Request, res: Response) {
   await prisma.product.update({
     where: { id: existing.id },
     data: {
-      isService: data.itemType === "SERVICE",
-      name: data.name,
-      itemCode: data.itemCode || null,
-      barcode: data.barcode || null,
-      hsnCode: data.hsnCode || null,
-      categoryId: category?.id || null,
-      unitId: unit.id,
-      salePrice: data.salePrice,
-      purchasePrice: data.purchasePrice ?? null,
-      priceType: data.priceType,
-      taxId: data.taxId || null,
-      defaultDiscount: data.defaultDiscount ?? 0,
-      defaultDiscountType: data.defaultDiscountType,
-      openingStock: data.openingStock,
-      minStock: data.minStock,
+      ...productData,
       currentStock: toDecimal(existing.currentStock).plus(stockDelta).toNumber(),
     },
   });

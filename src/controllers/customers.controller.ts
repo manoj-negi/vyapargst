@@ -5,7 +5,7 @@ import { AppError } from "../middleware/errorHandler";
 import { INDIAN_STATES } from "../lib/indianStates";
 import { GSTIN_REGEX, PAN_REGEX, PHONE_REGEX } from "../lib/validators";
 
-const customerSchema = z.object({
+export const customerSchema = z.object({
   name: z.string().trim().min(1, "Customer name is required"),
   phone: z
     .string()
@@ -33,7 +33,26 @@ const customerSchema = z.object({
   state: z.string().trim().refine((v) => (INDIAN_STATES as readonly string[]).includes(v), "Select a valid state"),
   pincode: z.string().trim().optional().or(z.literal("")),
   customerType: z.enum(["REGISTERED", "UNREGISTERED", "CONSUMER"]).default("CONSUMER"),
+  department: z.string().trim().optional().or(z.literal("")),
+  section: z.string().trim().optional().or(z.literal("")),
 });
+
+export function toCustomerData(data: z.infer<typeof customerSchema>) {
+  return {
+    name: data.name,
+    phone: data.phone || null,
+    email: data.email || null,
+    gstin: data.gstin || null,
+    pan: data.pan || null,
+    billingAddress: data.billingAddress || null,
+    shippingAddress: data.shippingAddress || null,
+    state: data.state,
+    pincode: data.pincode || null,
+    customerType: data.customerType,
+    department: data.department || null,
+    section: data.section || null,
+  };
+}
 
 export async function listCustomers(req: Request, res: Response) {
   const business = res.locals.business;
@@ -100,16 +119,7 @@ export async function createCustomer(req: Request, res: Response) {
   await prisma.customer.create({
     data: {
       businessId: business.id,
-      name: data.name,
-      phone: data.phone || null,
-      email: data.email || null,
-      gstin: data.gstin || null,
-      pan: data.pan || null,
-      billingAddress: data.billingAddress || null,
-      shippingAddress: data.shippingAddress || null,
-      state: data.state,
-      pincode: data.pincode || null,
-      customerType: data.customerType,
+      ...toCustomerData(data),
     },
   });
 
@@ -137,16 +147,7 @@ export async function updateCustomer(req: Request, res: Response) {
   await prisma.customer.update({
     where: { id: existing.id },
     data: {
-      name: data.name,
-      phone: data.phone || null,
-      email: data.email || null,
-      gstin: data.gstin || null,
-      pan: data.pan || null,
-      billingAddress: data.billingAddress || null,
-      shippingAddress: data.shippingAddress || null,
-      state: data.state,
-      pincode: data.pincode || null,
-      customerType: data.customerType,
+      ...toCustomerData(data),
     },
   });
 

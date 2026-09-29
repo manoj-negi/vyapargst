@@ -4,3 +4,5 @@ dist/
 *.log
 public/uploads/logos/*
 !public/uploads/logos/.gitkeep
+public/uploads/items/*
+!public/uploads/items/.gitkeep

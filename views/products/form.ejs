@@ -1,7 +1,18 @@
 <%- include('../partials/layout-start', { title: product && product.id ? 'Edit Item' : 'Add Item', activeNav: 'products' }) %>
+<%
+  // product is either a saved record (with relations) or the raw request body after a validation error
+  function val(field) { return product && product[field] != null ? product[field] : ''; }
+  var baseUnitName = product ? (product.unitName || (product.unit ? product.unit.name : '')) : '';
+  var secondaryUnitName = product ? (product.secondaryUnitName || (product.secondaryUnit ? product.secondaryUnit.name : '')) : '';
+  var openingStockDate = product && product.openingStockDate ? new Date(product.openingStockDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+  function priceTypeOptions(selected) {
+    return '<option value="EXCLUSIVE"' + (selected !== 'INCLUSIVE' ? ' selected' : '') + '>Without Tax</option>' +
+           '<option value="INCLUSIVE"' + (selected === 'INCLUSIVE' ? ' selected' : '') + '>With Tax</option>';
+  }
+%>
 
 <div class="row g-4">
-  <div class="col-lg-8">
+  <div class="<%= product && product.id ? 'col-lg-8' : 'col-12' %>">
     <div class="card p-4">
       <h5 class="fw-bold mb-3"><%= product && product.id ? 'Edit Item' : 'Add Item' %></h5>
 
@@ -11,7 +22,7 @@
         </div>
       <% } %>
 
-      <form method="POST" action="<%= product && product.id ? '/products/' + product.id : '/products' %>">
+      <form method="POST" enctype="multipart/form-data" action="<%= product && product.id ? '/products/' + product.id : '/products' %>">
         <div class="btn-group mb-3" role="group">
           <input type="radio" class="btn-check" name="itemType" id="typeProduct" value="PRODUCT" <%= (!product || !product.isService) ? 'checked' : '' %>>
           <label class="btn btn-outline-primary btn-sm" for="typeProduct">Product</label>
@@ -44,25 +55,72 @@
             </datalist>
           </div>
           <div class="col-md-6">
-            <label class="form-label small fw-semibold">Unit *</label>
-            <input type="text" name="unitName" class="form-control" list="unitList" required value="<%= product && product.unit ? product.unit.name : '' %>">
-            <datalist id="unitList">
-              <% units.forEach(function(u) { %><option value="<%= u.name %>"><% }) %>
-            </datalist>
+            <label class="form-label small fw-semibold">Item Image</label>
+            <% if (product && product.imagePath) { %>
+              <div class="mb-2"><img src="<%= product.imagePath %>" alt="Item image" style="max-height: 64px;" class="rounded border"></div>
+            <% } %>
+            <input type="file" name="image" class="form-control" accept="image/png,image/jpeg,image/webp">
           </div>
 
           <div id="hsnSuggestions" class="col-12"></div>
+        </div>
+
+        <div class="form-section-title">Unit</div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Base Unit *</label>
+            <select id="baseUnit" name="unitName" class="form-select" required>
+              <option value="" <%= baseUnitName ? '' : 'selected' %> disabled>Select unit</option>
+              <% units.forEach(function(u) { %>
+                <option value="<%= u.name %>" <%= u.name === baseUnitName ? 'selected' : '' %>><%= u.name %> (<%= u.shortName %>)</option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Secondary Unit</label>
+            <select id="secondaryUnit" name="secondaryUnitName" class="form-select">
+              <option value="">None</option>
+              <% units.forEach(function(u) { %>
+                <option value="<%= u.name %>" <%= u.name === secondaryUnitName ? 'selected' : '' %>><%= u.name %> (<%= u.shortName %>)</option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12" id="conversionRow" <%= secondaryUnitName ? '' : 'hidden' %>>
+            <label class="form-label small fw-semibold">Conversion Rate</label>
+            <div class="input-group" style="max-width: 420px;">
+              <span class="input-group-text">1 <span class="ms-1" data-unit-label="base"><%= baseUnitName %></span> =</span>
+              <input type="number" name="conversionRate" class="form-control" step="0.0001" min="0" value="<%= val('conversionRate') %>">
+              <span class="input-group-text" data-unit-label="secondary"><%= secondaryUnitName %></span>
+            </div>
+          </div>
         </div>
 
         <div class="form-section-title">Pricing</div>
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label small fw-semibold">Sale Price *</label>
-            <input type="number" name="salePrice" class="form-control" step="0.01" min="0" required value="<%= product ? product.salePrice || '' : '' %>">
+            <div class="input-group">
+              <input type="number" name="salePrice" class="form-control" step="0.01" min="0" required value="<%= product ? product.salePrice || '' : '' %>">
+              <select name="priceType" class="form-select" style="max-width: 140px;"><%- priceTypeOptions(product && product.priceType) %></select>
+            </div>
           </div>
           <div class="col-md-6">
             <label class="form-label small fw-semibold">Purchase Price</label>
-            <input type="number" name="purchasePrice" class="form-control" step="0.01" min="0" value="<%= product ? product.purchasePrice || '' : '' %>">
+            <div class="input-group">
+              <input type="number" name="purchasePrice" class="form-control" step="0.01" min="0" value="<%= product ? product.purchasePrice || '' : '' %>">
+              <select name="purchasePriceType" class="form-select" style="max-width: 140px;"><%- priceTypeOptions(product && product.purchasePriceType) %></select>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Wholesale Price</label>
+            <div class="input-group">
+              <input type="number" name="wholesalePrice" class="form-control" step="0.01" min="0" value="<%= val('wholesalePrice') %>">
+              <select name="wholesalePriceType" class="form-select" style="max-width: 140px;"><%- priceTypeOptions(product && product.wholesalePriceType) %></select>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Minimum Wholesale Qty</label>
+            <input type="number" name="minWholesaleQty" class="form-control" step="0.01" min="0" value="<%= val('minWholesaleQty') %>">
           </div>
         </div>
 
@@ -77,20 +135,25 @@
               <% }) %>
             </select>
           </div>
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">Price Type</label>
-            <select name="priceType" class="form-select">
-              <option value="EXCLUSIVE" <%= (!product || product.priceType === 'EXCLUSIVE') ? 'selected' : '' %>>Without Tax (Exclusive)</option>
-              <option value="INCLUSIVE" <%= (product && product.priceType === 'INCLUSIVE') ? 'selected' : '' %>>With Tax (Inclusive)</option>
-            </select>
-          </div>
         </div>
 
         <div class="form-section-title">Stock</div>
         <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">Opening Stock</label>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Opening Quantity</label>
             <input type="number" name="openingStock" class="form-control" step="0.01" min="0" value="<%= product ? product.openingStock || 0 : 0 %>">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">At Price (per unit)</label>
+            <input type="number" name="openingStockPrice" class="form-control" step="0.01" min="0" value="<%= val('openingStockPrice') %>">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">As of Date</label>
+            <input type="date" name="openingStockDate" class="form-control" value="<%= openingStockDate %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Location</label>
+            <input type="text" name="stockLocation" class="form-control" value="<%= val('stockLocation') %>">
           </div>
           <div class="col-md-6">
             <label class="form-label small fw-semibold">Minimum Stock</label>
@@ -121,8 +184,8 @@
     </div>
   </div>
 
+  <% if (product && product.id) { %>
   <div class="col-lg-4">
-    <% if (product && product.id) { %>
       <div class="card p-3 mb-3">
         <div class="stat-label text-muted small">Current Stock</div>
         <div class="stat-value fs-3 fw-bold"><%= Number(product.currentStock) %></div>
@@ -146,16 +209,23 @@
           <% }) %>
         <% } %>
       </div>
-    <% } else { %>
-      <div class="card p-3">
-        <div class="text-muted small">
-          <i class="lucide-info"></i>
-          Start typing the item name to get HSN code suggestions from your HSN Master.
-        </div>
-      </div>
-    <% } %>
   </div>
+  <% } %>
 </div>
 
+<script>
+  (function () {
+    var base = document.getElementById('baseUnit');
+    var secondary = document.getElementById('secondaryUnit');
+    var row = document.getElementById('conversionRow');
+    function sync() {
+      row.hidden = !secondary.value.trim();
+      document.querySelector('[data-unit-label="base"]').textContent = base.value;
+      document.querySelector('[data-unit-label="secondary"]').textContent = secondary.value;
+    }
+    base.addEventListener('change', sync);
+    secondary.addEventListener('change', sync);
+  })();
+</script>
 <script src="/js/hsn-suggest.js"></script>
 <%- include('../partials/layout-end') %>

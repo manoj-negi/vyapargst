@@ -53,33 +53,7 @@ async function main() {
     taxByRate.set(rate, tax.id);
   }
 
-  const hsnEntries: Array<{ hsnCode: string; description: string; keywords: string; gstRate: number }> = [
-    { hsnCode: "48025690", description: "A4 Paper / Writing & Printing Paper", keywords: "a4, copy paper, printing paper, writing paper", gstRate: 18 },
-    { hsnCode: "48025790", description: "Other uncoated writing/printing paper", keywords: "paper, copier paper, ream", gstRate: 18 },
-    { hsnCode: "96081010", description: "Ball point pens", keywords: "ball pen, pen, ballpoint", gstRate: 18 },
-    { hsnCode: "96082000", description: "Felt tipped and other porous-tipped pens and markers", keywords: "marker, whiteboard marker, cd marker, felt pen", gstRate: 18 },
-    { hsnCode: "96091000", description: "Pencils (with lead encased in wooden sheath)", keywords: "pencil, lead pencil, wooden pencil", gstRate: 12 },
-    { hsnCode: "48202000", description: "Exercise books / notebooks", keywords: "notebook, exercise book, note pad, register", gstRate: 12 },
-    { hsnCode: "48201000", description: "Registers, account books, notebooks, letter pads", keywords: "notebook, register, letter pad", gstRate: 18 },
-    { hsnCode: "83051000", description: "Fittings for loose-leaf binders or files - binder clips", keywords: "binder clip, clip, paper clip, fastener", gstRate: 18 },
-    { hsnCode: "48202090", description: "Carbon paper / duplicating stencils", keywords: "carbon paper", gstRate: 18 },
-    { hsnCode: "39269080", description: "Plastic office/school supplies - stapler, files, drawing kits", keywords: "stapler, file, cobra file, drawing kit, correction pen", gstRate: 18 },
-    { hsnCode: "96063000", description: "Button moulds and parts, press fasteners", keywords: "fastener, clip", gstRate: 18 },
-    { hsnCode: "40169990", description: "Rubber erasers", keywords: "eraser, rubber", gstRate: 12 },
-    { hsnCode: "82142010", description: "Pencil sharpeners", keywords: "sharpener, pencil sharpener", gstRate: 18 },
-    { hsnCode: "96099090", description: "Tailor's chalk, crayons, drawing charcoal, drawing kits", keywords: "drawing kit, geometry box, crayon", gstRate: 12 },
-    { hsnCode: "39191010", description: "Self-adhesive tape (cellophane/BOPP tape)", keywords: "tape, captain tape, adhesive tape, cello tape", gstRate: 18 },
-    { hsnCode: "96110000", description: "Date, sealing or numbering stamps, hand-operated", keywords: "stamp", gstRate: 18 },
-  ];
-
-  for (const entry of hsnEntries) {
-    const existing = await prisma.hSNMaster.findFirst({ where: { businessId: business.id, hsnCode: entry.hsnCode } });
-    if (!existing) {
-      await prisma.hSNMaster.create({
-        data: { businessId: business.id, ...entry },
-      });
-    }
-  }
+  // HSN codes come from the shared stationery dataset (migration 20260929140000_seed_stationery_hsn).
 
   const unitNames = [
     { name: "Piece", shortName: "Pcs" },

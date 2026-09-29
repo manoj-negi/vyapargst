@@ -5,5 +5,5 @@ const app = createApp();
 
 app.listen(env.port, () => {
   // eslint-disable-next-line no-console
-  console.log(`BillEasy GST server running at http://localhost:${env.port}`);
+  console.log(`THE CITY CART server running at http://localhost:${env.port}`);
 });

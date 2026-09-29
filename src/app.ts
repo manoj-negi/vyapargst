@@ -19,6 +19,7 @@ import { settingsRouter } from "./routes/settings.routes";
 import { productsApiRouter } from "./routes/api/products.api";
 import { hsnApiRouter } from "./routes/api/hsn.api";
 import { invoicesApiRouter } from "./routes/api/invoices.api";
+import { customersApiRouter } from "./routes/api/customers.api";
 
 export function createApp() {
   const app = express();
@@ -67,6 +68,7 @@ export function createApp() {
   app.use(productsApiRouter);
   app.use(hsnApiRouter);
   app.use(invoicesApiRouter);
+  app.use(customersApiRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -20,6 +20,6 @@ document.addEventListener("keydown", (e) => {
       const instance = window.bootstrap && window.bootstrap.Modal.getInstance(modal);
       if (instance) instance.hide();
     });
-    document.querySelectorAll(".autocomplete-menu").forEach((el) => el.remove());
+    document.querySelectorAll(".autocomplete-menu").forEach((el) => (el.innerHTML = ""));
   }
 });

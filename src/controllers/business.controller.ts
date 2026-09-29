@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { INDIAN_STATES } from "../lib/indianStates";
 import { GSTIN_REGEX, PAN_REGEX, PHONE_REGEX } from "../lib/validators";
+import { copyStandardHsn } from "../services/hsn/copyStandardHsn";
 
 const businessSchema = z.object({
   name: z.string().trim().min(1, "Business name is required"),
@@ -35,6 +36,21 @@ const businessSchema = z.object({
   pincode: z.string().trim().optional().or(z.literal("")),
   country: z.string().trim().default("India"),
   gstRegistered: z.enum(["YES", "NO"]).default("YES"),
+  bankName: z.string().trim().optional().or(z.literal("")),
+  bankAccountNo: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || /^[0-9]{6,18}$/.test(v), "Account number must be 6-18 digits")
+    .optional()
+    .or(z.literal("")),
+  bankIfsc: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .refine((v) => v === "" || /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v), "Invalid IFSC code")
+    .optional()
+    .or(z.literal("")),
+  bankAccountHolder: z.string().trim().optional().or(z.literal("")),
 });
 
 export async function showBusinessSetup(req: Request, res: Response) {
@@ -85,6 +101,10 @@ export async function saveBusinessSetup(req: Request, res: Response) {
     pincode: data.pincode || null,
     country: data.country,
     gstRegistered: data.gstRegistered === "YES",
+    bankName: data.bankName || null,
+    bankAccountNo: data.bankAccountNo || null,
+    bankIfsc: data.bankIfsc || null,
+    bankAccountHolder: data.bankAccountHolder || null,
     ...(logoPath ? { logoPath } : {}),
   };
 
@@ -99,6 +119,7 @@ export async function saveBusinessSetup(req: Request, res: Response) {
         settings: { create: {} },
       },
     });
+    await copyStandardHsn(business.id);
   }
 
   req.session.businessId = business.id;

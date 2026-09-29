@@ -1,4 +1,4 @@
-# City App (BillEasy GST) — Status Report
+# City App (The City Cart) — Status Report
 
 Audited: 2026-09-15
 App: Indian GST billing & inventory app — Express + EJS + Prisma/PostgreSQL + TypeScript.

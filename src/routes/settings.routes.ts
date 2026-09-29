@@ -12,4 +12,6 @@ settingsRouter.post("/settings/tax-master/:id/toggle", settingsController.toggle
 
 settingsRouter.get("/settings/hsn-master", settingsController.listHsnMaster);
 settingsRouter.post("/settings/hsn-master", settingsController.createHsnMaster);
+settingsRouter.post("/settings/hsn-master/:id", settingsController.updateHsnMaster);
+settingsRouter.post("/settings/hsn-master/:id/delete", settingsController.deleteHsnMaster);
 settingsRouter.post("/settings/hsn-master/:id/toggle", settingsController.toggleHsnMaster);

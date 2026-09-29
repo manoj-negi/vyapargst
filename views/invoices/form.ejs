@@ -1,121 +1,150 @@
 <%- include('../partials/layout-start', { title: 'Create Sale Invoice', activeNav: 'invoices' }) %>
 
-<% if (errors && errors.length) { %>
-  <div class="alert alert-danger py-2 small">
-    <ul class="mb-0 ps-3"><% errors.forEach(function(e) { %><li><%= e %></li><% }) %></ul>
-  </div>
-<% } %>
+<div class="sale-page">
+  <% if (errors && errors.length) { %>
+    <div class="alert alert-danger py-2 small">
+      <ul class="mb-0 ps-3"><% errors.forEach(function(e) { %><li><%= e %></li><% }) %></ul>
+    </div>
+  <% } %>
 
-<form method="POST" action="/invoices" id="invoiceForm" data-business-state="<%= business.state %>">
-  <div class="row g-4">
-    <div class="col-lg-8">
-      <div class="card p-4 mb-4">
-        <div class="d-flex justify-content-between flex-wrap gap-3">
-          <div style="min-width: 260px;">
-            <h6 class="fw-bold text-uppercase text-muted small mb-3">Sale</h6>
-            <label class="form-label small fw-semibold">Customer *</label>
-            <select name="customerId" id="customerSelect" class="form-select" required>
-              <option value="">Select Customer</option>
-              <% customers.forEach(function(c) { %>
-                <option value="<%= c.id %>" data-state="<%= c.state %>"><%= c.name %><%= c.phone ? ' · ' + c.phone : '' %></option>
-              <% }) %>
+  <form method="POST" action="/invoices" id="invoiceForm" data-business-state="<%= business.state %>">
+    <section class="sale-hero">
+      <div class="sale-hero-customer">
+        <div class="sale-eyebrow"><i class="icon-receipt-indian-rupee"></i> New Sale</div>
+        <label class="form-label small fw-semibold" for="customerSelect">Bill To *</label>
+        <div class="d-flex gap-2">
+          <select name="customerId" id="customerSelect" class="form-select" required>
+            <option value="">Select Customer</option>
+            <% customers.forEach(function(c) { %>
+              <option value="<%= c.id %>" data-state="<%= c.state %>"><%= c.name %><%= c.phone ? ' · ' + c.phone : '' %></option>
+            <% }) %>
+          </select>
+          <button type="button" class="btn btn-outline-primary text-nowrap" data-bs-toggle="modal" data-bs-target="#newCustomerModal">
+            <i class="icon-plus"></i> New Customer
+          </button>
+        </div>
+        <div class="mt-2">
+          <span id="placeOfSupplyBadge" class="badge text-bg-secondary">Select a customer</span>
+        </div>
+      </div>
+      <div class="sale-hero-dates">
+        <div>
+          <label class="form-label small fw-semibold" for="invoiceDate">Invoice Date</label>
+          <input type="date" name="invoiceDate" id="invoiceDate" class="form-control" value="<%= new Date().toISOString().slice(0,10) %>">
+        </div>
+        <div>
+          <label class="form-label small fw-semibold" for="dueDate">Due Date</label>
+          <input type="date" name="dueDate" id="dueDate" class="form-control">
+        </div>
+      </div>
+    </section>
+
+    <section class="sale-panel">
+      <div class="sale-panel-head">
+        <h6 class="sale-panel-title">Items</h6>
+        <button type="button" id="addRowBtn" class="btn btn-sm sale-add-row"><i class="icon-plus"></i> Add Row</button>
+      </div>
+      <div class="table-scroll">
+        <table class="table table-app sale-items-table mb-0">
+          <thead>
+            <tr>
+              <th class="c-num">#</th>
+              <th class="c-item">Item</th>
+              <th class="c-qty">Qty</th>
+              <th class="c-unit">Unit</th>
+              <th class="c-price">Price/Unit</th>
+              <th class="c-disc">Discount</th>
+              <th class="c-amt">Taxable</th>
+              <th class="c-gst">GST</th>
+              <th class="c-amt col-cgst-sgst">CGST</th>
+              <th class="c-amt col-cgst-sgst">SGST</th>
+              <th class="c-amt col-igst d-none">IGST</th>
+              <th class="c-amt">Total</th>
+              <th class="c-del"></th>
+            </tr>
+          </thead>
+          <tbody id="itemsTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="sale-bottom">
+      <section class="sale-panel">
+        <h6 class="sale-panel-title">Payment</h6>
+        <div class="sale-payment-grid">
+          <div>
+            <label class="form-label small fw-semibold" for="paymentType">Payment Type</label>
+            <select name="paymentType" id="paymentType" class="form-select">
+              <option value="CASH">Cash</option>
+              <option value="UPI">UPI</option>
+              <option value="BANK_TRANSFER">Bank Transfer</option>
+              <option value="CARD">Card</option>
+              <option value="CREDIT">Credit</option>
+              <option value="OTHER">Other</option>
             </select>
-            <div class="mt-2">
-              <span id="placeOfSupplyBadge" class="badge text-bg-secondary">Select a customer</span>
+          </div>
+          <div>
+            <label class="form-label small fw-semibold" for="receivedInput">Received Amount</label>
+            <div class="input-group">
+              <span class="input-group-text">₹</span>
+              <input type="number" name="receivedAmount" id="receivedInput" class="form-control" min="0" step="0.01" value="0">
             </div>
           </div>
-          <div style="min-width: 220px;">
-            <label class="form-label small fw-semibold">Invoice Date</label>
-            <input type="date" name="invoiceDate" class="form-control" value="<%= new Date().toISOString().slice(0,10) %>">
-            <label class="form-label small fw-semibold mt-2">Due Date</label>
-            <input type="date" name="dueDate" class="form-control">
+        </div>
+        <div class="sale-balance">
+          <div>
+            <div class="text-muted small">Balance Due</div>
+            <div id="balanceDisplay" class="sale-balance-value">₹0.00</div>
           </div>
+          <span id="paymentStatusBadge" class="status-badge status-unpaid">UNPAID</span>
         </div>
-      </div>
+      </section>
 
-      <div class="card p-3">
-        <div class="table-scroll">
-          <table class="table table-app mb-2" style="min-width: 900px;">
-            <thead>
-              <tr>
-                <th style="width:32px;">#</th>
-                <th style="min-width:220px;">Item</th>
-                <th style="width:80px;">Qty</th>
-                <th style="width:70px;">Unit</th>
-                <th style="width:100px;">Price/Unit</th>
-                <th style="width:120px;">Discount</th>
-                <th style="width:100px;">Taxable</th>
-                <th style="width:60px;">GST</th>
-                <th class="col-cgst-sgst" style="width:90px;">CGST</th>
-                <th class="col-cgst-sgst" style="width:90px;">SGST</th>
-                <th class="col-igst d-none" style="width:90px;">IGST</th>
-                <th style="width:100px;">Total</th>
-                <th style="width:36px;"></th>
-              </tr>
-            </thead>
-            <tbody id="itemsTbody"></tbody>
-          </table>
-        </div>
-        <button type="button" id="addRowBtn" class="btn btn-sm btn-outline-primary">+ Add Row</button>
-      </div>
-    </div>
-
-    <div class="col-lg-4">
-      <div class="card p-4 invoice-totals-box">
-        <h6 class="fw-bold text-uppercase text-muted small mb-3">Invoice Total</h6>
-
-        <div class="d-flex justify-content-between mb-2">
-          <span class="text-muted small">Invoice Discount</span>
-          <div class="d-flex gap-1" style="width: 150px;">
-            <input type="number" id="invoiceDiscountValue" class="form-control form-control-sm" value="0" min="0" step="0.01">
-            <select id="invoiceDiscountType" class="form-select form-select-sm" style="width: 70px;">
+      <section class="sale-receipt">
+        <div class="sale-receipt-row">
+          <span>Invoice Discount</span>
+          <div class="sale-inv-discount">
+            <input type="number" id="invoiceDiscountValue" class="form-control form-control-sm" value="0" min="0" step="0.01" aria-label="Invoice discount">
+            <select id="invoiceDiscountType" class="form-select form-select-sm" aria-label="Invoice discount type">
               <option value="PERCENTAGE">%</option>
               <option value="FIXED">₹</option>
             </select>
           </div>
         </div>
-
-        <hr>
-        <div class="d-flex justify-content-between small mb-1"><span>Subtotal</span><span id="subtotalDisplay">₹0.00</span></div>
-        <div class="d-flex justify-content-between small mb-1"><span>Discount</span><span id="discountDisplay">₹0.00</span></div>
-        <div class="d-flex justify-content-between small mb-1 fw-semibold"><span>Taxable Amount</span><span id="taxableDisplay">₹0.00</span></div>
-        <div class="d-flex justify-content-between small mb-1 col-cgst-sgst"><span>CGST</span><span id="cgstDisplay">₹0.00</span></div>
-        <div class="d-flex justify-content-between small mb-1 col-cgst-sgst"><span>SGST</span><span id="sgstDisplay">₹0.00</span></div>
-        <div class="d-flex justify-content-between small mb-1 col-igst d-none"><span>IGST</span><span id="igstDisplay">₹0.00</span></div>
-        <div class="d-flex justify-content-between small mb-1"><span>CESS</span><span id="cessDisplay">₹0.00</span></div>
-        <div class="d-flex justify-content-between small mb-1"><span>Round Off</span><span id="roundOffDisplay">₹0.00</span></div>
-        <hr>
-        <div class="d-flex justify-content-between fs-5 fw-bold mb-3"><span>TOTAL</span><span id="grandTotalDisplay">₹0.00</span></div>
-        <input type="hidden" id="grandTotalHidden" value="0">
-
-        <div class="form-section-title">Payment</div>
-        <label class="form-label small fw-semibold">Payment Type</label>
-        <select name="paymentType" class="form-select mb-2">
-          <option value="CASH">Cash</option>
-          <option value="UPI">UPI</option>
-          <option value="BANK_TRANSFER">Bank Transfer</option>
-          <option value="CARD">Card</option>
-          <option value="CREDIT">Credit</option>
-          <option value="OTHER">Other</option>
-        </select>
-        <label class="form-label small fw-semibold">Received Amount</label>
-        <input type="number" name="receivedAmount" id="receivedInput" class="form-control mb-2" min="0" step="0.01" value="0">
-        <div class="d-flex justify-content-between small mb-2">
-          <span class="text-muted">Balance</span>
-          <span id="balanceDisplay">₹0.00</span>
+        <div class="sale-receipt-divider"></div>
+        <div class="sale-receipt-row"><span>Subtotal</span><span id="subtotalDisplay">₹0.00</span></div>
+        <div class="sale-receipt-row"><span>Discount</span><span id="discountDisplay">₹0.00</span></div>
+        <div class="sale-receipt-row fw-semibold"><span>Taxable Amount</span><span id="taxableDisplay">₹0.00</span></div>
+        <div class="sale-receipt-row col-cgst-sgst"><span>CGST</span><span id="cgstDisplay">₹0.00</span></div>
+        <div class="sale-receipt-row col-cgst-sgst"><span>SGST</span><span id="sgstDisplay">₹0.00</span></div>
+        <div class="sale-receipt-row col-igst d-none"><span>IGST</span><span id="igstDisplay">₹0.00</span></div>
+        <div class="sale-receipt-row"><span>CESS</span><span id="cessDisplay">₹0.00</span></div>
+        <div class="sale-receipt-row"><span>Round Off</span><span id="roundOffDisplay">₹0.00</span></div>
+        <div class="sale-receipt-total">
+          <span>Total</span>
+          <span id="grandTotalDisplay">₹0.00</span>
         </div>
-        <span id="paymentStatusBadge" class="status-badge status-unpaid">UNPAID</span>
+        <input type="hidden" id="grandTotalHidden" value="0">
+      </section>
+    </div>
 
-        <button type="submit" class="btn btn-primary-app w-100 mt-4 py-2" data-shortcut-save>Save Invoice (Ctrl+S)</button>
+    <div class="sale-actionbar">
+      <div>
+        <div class="sale-actionbar-label"><span id="itemCountDisplay">0 items</span> · Grand Total</div>
+        <div id="stickyTotalDisplay" class="sale-actionbar-total">₹0.00</div>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="/invoices" class="btn sale-btn-ghost">Cancel</a>
+        <button type="submit" class="btn sale-btn-save" data-shortcut-save>Save Invoice <kbd>Ctrl+S</kbd></button>
       </div>
     </div>
-  </div>
-</form>
+  </form>
+</div>
 
 <template id="itemRowTemplate">
   <tr class="invoice-item-row">
     <td class="row-number">1</td>
-    <td style="position: relative;">
+    <td>
       <input type="text" class="form-control form-control-sm item-name-input" data-name="productName" placeholder="Type item name..." autocomplete="off" required>
       <input type="hidden" class="product-id-input" data-name="productId">
       <input type="hidden" class="hsn-input" data-name="hsn">
@@ -128,9 +157,9 @@
     <td><span class="unit-display">-</span></td>
     <td><input type="number" class="form-control form-control-sm price-input" data-name="unitPrice" min="0" step="0.01" value="0"></td>
     <td>
-      <div class="d-flex gap-1">
-        <input type="number" class="form-control form-control-sm discount-input" data-name="discountValue" min="0" step="0.01" value="0">
-        <select class="form-select form-select-sm discount-type-select" data-name="discountType">
+      <div class="input-group input-group-sm sale-disc-group">
+        <input type="number" class="form-control discount-input" data-name="discountValue" min="0" step="0.01" value="0">
+        <select class="form-select discount-type-select" data-name="discountType">
           <option value="PERCENTAGE">%</option>
           <option value="FIXED">₹</option>
         </select>
@@ -142,9 +171,81 @@
     <td class="sgst-cell col-cgst-sgst">₹0.00</td>
     <td class="igst-cell col-igst d-none">₹0.00</td>
     <td class="total-cell fw-semibold">₹0.00</td>
-    <td><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="lucide-trash-2"></i>×</button></td>
+    <td><button type="button" class="sale-remove-row remove-row-btn" title="Remove row" aria-label="Remove row"><i class="icon-trash-2"></i></button></td>
   </tr>
 </template>
 
+<%# Kept outside #invoiceForm — HTML forms cannot be nested. %>
+<div class="modal fade" id="newCustomerModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form id="newCustomerForm" novalidate>
+        <div class="modal-header">
+          <h6 class="modal-title fw-bold">New Customer</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="newCustomerErrors" class="alert alert-danger py-2 small d-none"></div>
+          <%- include('../customers/_fields', { customer: null, states: states, defaultState: business.state }) %>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary-app" id="newCustomerSave">Save Customer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var modalEl = document.getElementById('newCustomerModal');
+    var form = document.getElementById('newCustomerForm');
+    var errorsBox = document.getElementById('newCustomerErrors');
+    var saveBtn = document.getElementById('newCustomerSave');
+    var select = document.getElementById('customerSelect');
+
+    function showErrors(messages) {
+      errorsBox.innerHTML = '';
+      var ul = document.createElement('ul');
+      ul.className = 'mb-0 ps-3';
+      messages.forEach(function (m) { var li = document.createElement('li'); li.textContent = m; ul.appendChild(li); });
+      errorsBox.appendChild(ul);
+      errorsBox.classList.remove('d-none');
+    }
+
+    modalEl.addEventListener('shown.bs.modal', function () { form.elements.name.focus(); });
+    modalEl.addEventListener('hidden.bs.modal', function () { errorsBox.classList.add('d-none'); });
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      saveBtn.disabled = true;
+      try {
+        var res = await fetch('/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(Object.fromEntries(new FormData(form))),
+        });
+        var body = await res.json();
+        if (!res.ok) { showErrors(body.errors || [body.error || 'Could not save customer']); return; }
+
+        var c = body.customer;
+        var option = new Option(c.name + (c.phone ? ' · ' + c.phone : ''), c.id, true, true);
+        option.dataset.state = c.state;
+        select.add(option);
+        // Let the invoice form recalculate place of supply / CGST-SGST vs IGST for the new customer.
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+
+        form.reset();
+        bootstrap.Modal.getInstance(modalEl).hide();
+      } catch (err) {
+        showErrors(['Network error — please try again.']);
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
+  })();
+</script>
 <script src="/js/invoice-form.js"></script>
 <%- include('../partials/layout-end') %>

@@ -5,7 +5,7 @@
     <input type="text" name="q" class="form-control form-control-sm" style="width: 260px" placeholder="Search name, phone or GSTIN" value="<%= q %>">
     <button type="submit" class="btn btn-sm btn-outline-secondary">Search</button>
   </form>
-  <a href="/customers/new" class="btn btn-accent"><i class="lucide-plus"></i> Add Customer</a>
+  <a href="/customers/new" class="btn btn-accent"><i class="icon-plus"></i> Add Customer</a>
 </div>
 
 <div class="card">
@@ -18,7 +18,7 @@
         <% if (customers.length === 0) { %>
           <tr><td colspan="6">
             <div class="empty-state">
-              <i class="lucide-users"></i>
+              <i class="icon-users"></i>
               No customers yet. <a href="/customers/new">Add your first customer</a>.
             </div>
           </td></tr>

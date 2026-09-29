@@ -93,6 +93,11 @@ model Business {
   pincode        String?
   country        String   @default("India")
   gstRegistered  Boolean  @default(true)
+  // Printed in the "Bank Details" box on invoices
+  bankName          String?
+  bankAccountNo     String?
+  bankIfsc          String?
+  bankAccountHolder String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -133,6 +138,8 @@ model Customer {
   state            String
   pincode          String?
   customerType     CustomerType @default(CONSUMER)
+  department       String?
+  section          String?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
@@ -157,7 +164,8 @@ model Unit {
   business   Business  @relation(fields: [businessId], references: [id])
   name       String
   shortName  String
-  products   Product[]
+  products   Product[] @relation("ProductBaseUnit")
+  secondaryProducts Product[] @relation("ProductSecondaryUnit")
 
   @@unique([businessId, name])
 }
@@ -170,16 +178,27 @@ model Product {
   itemCode         String?
   barcode          String?
   isService        Boolean       @default(false)
+  imagePath        String?
 
   hsnCode          String?
   categoryId       String?
   category         Category?     @relation(fields: [categoryId], references: [id])
   unitId           String?
-  unit             Unit?         @relation(fields: [unitId], references: [id])
+  unit             Unit?         @relation("ProductBaseUnit", fields: [unitId], references: [id])
+  // Optional secondary unit: 1 base unit = conversionRate secondary units (e.g. 1 BOX = 12 PIECES)
+  secondaryUnitId  String?
+  secondaryUnit    Unit?         @relation("ProductSecondaryUnit", fields: [secondaryUnitId], references: [id])
+  conversionRate   Decimal?      @db.Decimal(12, 4)
 
   salePrice        Decimal       @db.Decimal(12, 2)
-  purchasePrice    Decimal?      @db.Decimal(12, 2)
+  // Tax treatment of salePrice (With Tax / Without Tax)
   priceType        PriceType     @default(EXCLUSIVE)
+  purchasePrice    Decimal?      @db.Decimal(12, 2)
+  purchasePriceType PriceType    @default(EXCLUSIVE)
+
+  wholesalePrice     Decimal?    @db.Decimal(12, 2)
+  wholesalePriceType PriceType   @default(EXCLUSIVE)
+  minWholesaleQty    Decimal?    @db.Decimal(12, 2)
 
   taxId            String?
   tax              TaxMaster?    @relation(fields: [taxId], references: [id])
@@ -188,6 +207,10 @@ model Product {
   defaultDiscountType DiscountType @default(PERCENTAGE)
 
   openingStock     Decimal       @default(0) @db.Decimal(12, 2)
+  // Per-unit value of the opening stock and the date it was counted
+  openingStockPrice Decimal?     @db.Decimal(12, 2)
+  openingStockDate DateTime?
+  stockLocation    String?
   minStock         Decimal       @default(0) @db.Decimal(12, 2)
   currentStock     Decimal       @default(0) @db.Decimal(12, 2)
 

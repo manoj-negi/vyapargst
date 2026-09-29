@@ -1,4 +1,4 @@
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma";
 
@@ -7,7 +7,7 @@ export function showLogin(req: Request, res: Response) {
   res.render("auth/login", { title: "Login", error: null });
 }
 
-export async function login(req: Request, res: Response) {
+export async function login(req: Request, res: Response, next: NextFunction) {
   const { email, password } = req.body as { email?: string; password?: string };
 
   if (!email || !password) {
@@ -27,9 +27,13 @@ export async function login(req: Request, res: Response) {
     });
   }
 
-  req.session.userId = user.id;
-  req.session.userName = user.name;
-  res.redirect("/dashboard");
+  // Start a fresh session so nothing from a previous login (e.g. its businessId) carries over.
+  req.session.regenerate((err) => {
+    if (err) return next(err);
+    req.session.userId = user.id;
+    req.session.userName = user.name;
+    res.redirect("/dashboard");
+  });
 }
 
 export function logout(req: Request, res: Response) {

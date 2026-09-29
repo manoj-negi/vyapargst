@@ -22,3 +22,24 @@ export const uploadLogo = multer({
     cb(null, true);
   },
 });
+
+const itemImageStorage = multer.diskStorage({
+  destination: path.join(__dirname, "../../public/uploads/items"),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${crypto.randomUUID()}${ext}`);
+  },
+});
+
+const ALLOWED_ITEM_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+export const uploadItemImage = multer({
+  storage: itemImageStorage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!ALLOWED_ITEM_IMAGE_TYPES.has(file.mimetype)) {
+      return cb(new Error("Only PNG, JPEG or WEBP item images are allowed"));
+    }
+    cb(null, true);
+  },
+});

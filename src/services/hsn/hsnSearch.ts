@@ -23,17 +23,13 @@ export async function searchHsn(
   const rows = await prisma.hSNMaster.findMany({
     where: {
       isActive: true,
-      // businessId is nullable to allow a future shared/global HSN dataset; for now every row
-      // is created scoped to a business (see settings.controller), so include null defensively.
-      OR: [{ businessId }, { businessId: null }],
-      AND: [
-        {
-          OR: [
-            { description: { contains: trimmed, mode: "insensitive" } },
-            { keywords: { contains: trimmed, mode: "insensitive" } },
-            { hsnCode: { startsWith: trimmed } },
-          ],
-        },
+      // Only the business's own rows; the shared (businessId null) rows are just the template
+      // copied into each business by copyStandardHsn.
+      businessId,
+      OR: [
+        { description: { contains: trimmed, mode: "insensitive" } },
+        { keywords: { contains: trimmed, mode: "insensitive" } },
+        { hsnCode: { startsWith: trimmed } },
       ],
     },
     take: limit,

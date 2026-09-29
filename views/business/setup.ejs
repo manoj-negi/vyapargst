@@ -92,6 +92,26 @@
       </div>
     </div>
 
+    <div class="form-section-title">Bank Details <span class="text-muted fw-normal small">(printed on invoices)</span></div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Bank Name &amp; Branch</label>
+        <input type="text" name="bankName" class="form-control" placeholder="Canara Bank - Sahastradhara Road" value="<%= business ? business.bankName || '' : '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Account Holder's Name</label>
+        <input type="text" name="bankAccountHolder" class="form-control" value="<%= business ? business.bankAccountHolder || '' : '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Account No.</label>
+        <input type="text" name="bankAccountNo" class="form-control" inputmode="numeric" maxlength="18" value="<%= business ? business.bankAccountNo || '' : '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">IFSC Code</label>
+        <input type="text" name="bankIfsc" class="form-control text-uppercase" maxlength="11" value="<%= business ? business.bankIfsc || '' : '' %>">
+      </div>
+    </div>
+
     <div class="mt-4">
       <button type="submit" class="btn btn-primary-app px-4">Save Business Profile</button>
     </div>

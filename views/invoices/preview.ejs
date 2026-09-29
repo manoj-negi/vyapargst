@@ -11,8 +11,8 @@
     <% if (invoice.balance > 0) { %>
       <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#paymentModal">Record Payment</button>
     <% } %>
-    <button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="lucide-printer"></i> Print (Ctrl+P)</button>
-    <a href="/invoices/<%= invoice.id %>/pdf" class="btn btn-primary-app"><i class="lucide-download"></i> Download PDF</a>
+    <button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="icon-printer"></i> Print (Ctrl+P)</button>
+    <a href="/invoices/<%= invoice.id %>/pdf" class="btn btn-primary-app"><i class="icon-download"></i> Download PDF</a>
   </div>
 </div>
 
