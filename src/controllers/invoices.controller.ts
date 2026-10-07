@@ -289,3 +289,164 @@ export async function cancelInvoice(req: Request, res: Response) {
   req.session.flash = { type: "success", message: `Invoice ${invoice.invoiceNo} cancelled and stock restored.` };
   res.redirect("/invoices");
 }
+
+export async function showEditInvoice(req: Request, res: Response) {
+  const business = res.locals.business;
+  const invoice = await prisma.saleInvoice.findFirst({
+    where: { id: req.params.id, businessId: business.id },
+    include: { items: true },
+  });
+
+  if (!invoice) throw new AppError("Invoice not found", 404);
+  if (invoice.status === "CANCELLED") throw new AppError("Cannot edit a cancelled invoice", 400);
+
+  const customers = await prisma.customer.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" } });
+
+  res.render("invoices/form", {
+    title: `Edit Invoice ${invoice.invoiceNo}`,
+    activeNav: "invoices",
+    invoice,
+    customers,
+    states: INDIAN_STATES,
+    errors: null,
+  });
+}
+
+export async function updateInvoice(req: Request, res: Response) {
+  const business = res.locals.business;
+  const parsed = invoiceSchema.safeParse(req.body);
+
+  const invoice = await prisma.saleInvoice.findFirst({
+    where: { id: req.params.id, businessId: business.id },
+    include: { items: true },
+  });
+
+  if (!invoice) throw new AppError("Invoice not found", 404);
+  if (invoice.status === "CANCELLED") throw new AppError("Cannot edit a cancelled invoice", 400);
+
+  if (!parsed.success) {
+    const customers = await prisma.customer.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" } });
+    return res.status(422).render("invoices/form", {
+      title: `Edit Invoice ${invoice.invoiceNo}`,
+      activeNav: "invoices",
+      invoice,
+      customers,
+      states: INDIAN_STATES,
+      errors: parsed.error.errors.map((e) => e.message),
+    });
+  }
+
+  const data = parsed.data;
+  const customer = await prisma.customer.findFirst({ where: { id: data.customerId, businessId: business.id } });
+  if (!customer) throw new AppError("Customer not found", 404);
+
+  const intra = isIntraState(business.state, customer.state);
+
+  const enrichedItems = await Promise.all(
+    data.items.map(async (item) => {
+      if (!item.productId) return item;
+      const product = await prisma.product.findFirst({
+        where: { id: item.productId, businessId: business.id },
+        include: { tax: true },
+      });
+      if (!product) return item;
+      return {
+        ...item,
+        hsn: product.hsnCode || item.hsn,
+        gstRate: product.tax ? Number(product.tax.rate) : 0,
+      };
+    })
+  );
+
+  const lineResults = enrichedItems.map((item) =>
+    calculateLineItem({
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      priceType: item.priceType,
+      discountValue: item.discountValue,
+      discountType: item.discountType,
+      gstRate: item.gstRate,
+      isIntraState: intra,
+    })
+  );
+
+  const settings = business.settings ?? {
+    roundOffMode: "AUTOMATIC" as const,
+    negativeStockPolicy: "ALLOW_WITH_WARNING" as const,
+  };
+
+  const totals = calculateInvoiceTotals({
+    lines: lineResults,
+    invoiceDiscount: { value: data.invoiceDiscountValue, type: data.invoiceDiscountType },
+    roundOffMode: settings.roundOffMode,
+  });
+
+  const invoiceDate = data.invoiceDate ? new Date(data.invoiceDate) : invoice.invoiceDate;
+  // Received amount is handled via payments natively, but if they change the total, we should update the status.
+  const receivedAmount = invoice.receivedAmount;
+  const balance = Math.max(totals.total.toNumber() - Number(receivedAmount), 0);
+  const paymentStatus =
+    Number(receivedAmount) <= 0 ? "UNPAID" : Number(receivedAmount) >= totals.total.toNumber() ? "PAID" : "PARTIALLY_PAID";
+
+  await prisma.$transaction(async (tx) => {
+    // 1. Restore stock for old items
+    await restoreStockForCancelledSale(tx, invoice.id);
+    
+    // 2. Delete old items
+    await tx.saleInvoiceItem.deleteMany({ where: { invoiceId: invoice.id } });
+
+    // 3. Update invoice
+    await tx.saleInvoice.update({
+      where: { id: invoice.id },
+      data: {
+        customerId: customer.id,
+        invoiceDate,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        placeOfSupply: customer.state,
+        taxType: intra ? "INTRA_STATE" : "INTER_STATE",
+        subtotal: totals.subtotal.toNumber(),
+        discount: totals.discount.toNumber(),
+        taxableAmount: totals.taxableAmount.toNumber(),
+        cgst: totals.cgst.toNumber(),
+        sgst: totals.sgst.toNumber(),
+        igst: totals.igst.toNumber(),
+        cess: totals.cess.toNumber(),
+        roundOff: totals.roundOff.toNumber(),
+        total: totals.total.toNumber(),
+        balance,
+        paymentStatus,
+        items: {
+          create: enrichedItems.map((item, i) => ({
+            productId: item.productId || null,
+            productName: item.productName,
+            hsn: item.hsn || null,
+            unit: item.unit || null,
+            quantity: item.quantity,
+            rate: item.unitPrice,
+            discount: item.discountValue,
+            discountType: item.discountType,
+            taxRate: item.gstRate,
+            taxableAmount: lineResults[i].taxableValue.toNumber(),
+            cgst: lineResults[i].cgst.toNumber(),
+            sgst: lineResults[i].sgst.toNumber(),
+            igst: lineResults[i].igst.toNumber(),
+            finalAmount: lineResults[i].total.toNumber(),
+          })),
+        },
+      },
+    });
+
+    // 4. Deduct stock for new items
+    await deductStockForSale(
+      tx,
+      enrichedItems
+        .filter((i) => i.productId)
+        .map((i) => ({ productId: i.productId as string, quantity: i.quantity })),
+      invoice.id,
+      settings.negativeStockPolicy
+    );
+  });
+
+  req.session.flash = { type: "success", message: `Invoice ${invoice.invoiceNo} updated successfully.` };
+  res.redirect(`/invoices/${invoice.id}`);
+}

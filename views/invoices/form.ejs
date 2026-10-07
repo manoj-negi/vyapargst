@@ -1,4 +1,4 @@
-<%- include('../partials/layout-start', { title: 'Create Sale Invoice', activeNav: 'invoices' }) %>
+<%- include('../partials/layout-start', { title: invoice ? 'Edit Invoice ' + invoice.invoiceNo : 'Create Sale Invoice', activeNav: 'invoices' }) %>
 
 <div class="sale-page">
   <% if (errors && errors.length) { %>
@@ -7,16 +7,16 @@
     </div>
   <% } %>
 
-  <form method="POST" action="/invoices" id="invoiceForm" data-business-state="<%= business.state %>">
+  <form method="POST" action="<%= invoice ? '/invoices/' + invoice.id + '/edit' : '/invoices' %>" id="invoiceForm" data-business-state="<%= business.state %>">
     <section class="sale-hero">
       <div class="sale-hero-customer">
-        <div class="sale-eyebrow"><i class="icon-receipt-indian-rupee"></i> New Sale</div>
+        <div class="sale-eyebrow"><i class="icon-receipt-indian-rupee"></i> <%= invoice ? 'Edit Sale' : 'New Sale' %></div>
         <label class="form-label small fw-semibold" for="customerSelect">Bill To *</label>
         <div class="d-flex gap-2">
           <select name="customerId" id="customerSelect" class="form-select" required>
             <option value="">Select Customer</option>
             <% customers.forEach(function(c) { %>
-              <option value="<%= c.id %>" data-state="<%= c.state %>"><%= c.name %><%= c.phone ? ' · ' + c.phone : '' %></option>
+              <option value="<%= c.id %>" data-state="<%= c.state %>" <%= invoice && invoice.customerId === c.id ? 'selected' : '' %>><%= c.name %><%= c.section ? ' (' + c.section + ')' : '' %><%= c.phone ? ' · ' + c.phone : '' %></option>
             <% }) %>
           </select>
           <button type="button" class="btn btn-outline-primary text-nowrap" data-bs-toggle="modal" data-bs-target="#newCustomerModal">
@@ -30,11 +30,11 @@
       <div class="sale-hero-dates">
         <div>
           <label class="form-label small fw-semibold" for="invoiceDate">Invoice Date</label>
-          <input type="date" name="invoiceDate" id="invoiceDate" class="form-control" value="<%= new Date().toISOString().slice(0,10) %>">
+          <input type="date" name="invoiceDate" id="invoiceDate" class="form-control" value="<%= invoice ? new Date(invoice.invoiceDate).toISOString().slice(0,10) : new Date().toISOString().slice(0,10) %>">
         </div>
         <div>
           <label class="form-label small fw-semibold" for="dueDate">Due Date</label>
-          <input type="date" name="dueDate" id="dueDate" class="form-control">
+          <input type="date" name="dueDate" id="dueDate" class="form-control" value="<%= invoice && invoice.dueDate ? new Date(invoice.dueDate).toISOString().slice(0,10) : '' %>">
         </div>
       </div>
     </section>
@@ -87,8 +87,11 @@
             <label class="form-label small fw-semibold" for="receivedInput">Received Amount</label>
             <div class="input-group">
               <span class="input-group-text">₹</span>
-              <input type="number" name="receivedAmount" id="receivedInput" class="form-control" min="0" step="0.01" value="0">
+              <input type="number" name="receivedAmount" id="receivedInput" class="form-control" min="0" step="0.01" value="<%= invoice ? invoice.receivedAmount : 0 %>" <%= invoice && invoice.receivedAmount > 0 ? 'readonly' : '' %>>
             </div>
+            <% if (invoice && invoice.receivedAmount > 0) { %>
+              <div class="form-text text-muted">Use 'Record Payment' to change this.</div>
+            <% } %>
           </div>
         </div>
         <div class="sale-balance">
@@ -104,10 +107,10 @@
         <div class="sale-receipt-row">
           <span>Invoice Discount</span>
           <div class="sale-inv-discount">
-            <input type="number" id="invoiceDiscountValue" class="form-control form-control-sm" value="0" min="0" step="0.01" aria-label="Invoice discount">
-            <select id="invoiceDiscountType" class="form-select form-select-sm" aria-label="Invoice discount type">
+            <input type="number" name="invoiceDiscountValue" id="invoiceDiscountValue" class="form-control form-control-sm" value="<%= invoice ? invoice.discount : 0 %>" min="0" step="0.01" aria-label="Invoice discount">
+            <select name="invoiceDiscountType" id="invoiceDiscountType" class="form-select form-select-sm" aria-label="Invoice discount type">
               <option value="PERCENTAGE">%</option>
-              <option value="FIXED">₹</option>
+              <option value="FIXED" <%= invoice ? 'selected' : '' %>>₹</option>
             </select>
           </div>
         </div>
@@ -198,6 +201,7 @@
 </div>
 
 <script>
+  window.__invoiceExistingItems = <%- invoice ? JSON.stringify(invoice.items) : '[]' %>;
   (function () {
     var modalEl = document.getElementById('newCustomerModal');
     var form = document.getElementById('newCustomerForm');
@@ -231,7 +235,9 @@
         if (!res.ok) { showErrors(body.errors || [body.error || 'Could not save customer']); return; }
 
         var c = body.customer;
-        var option = new Option(c.name + (c.phone ? ' · ' + c.phone : ''), c.id, true, true);
+        var sectionText = c.section ? ' (' + c.section + ')' : '';
+        var optionText = c.name + sectionText + (c.phone ? ' · ' + c.phone : '');
+        var option = new Option(optionText, c.id, true, true);
         option.dataset.state = c.state;
         select.add(option);
         // Let the invoice form recalculate place of supply / CGST-SGST vs IGST for the new customer.

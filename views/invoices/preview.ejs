@@ -8,7 +8,10 @@
     </span>
   </div>
   <div class="d-flex gap-2" data-shortcut-print>
-    <% if (invoice.balance > 0) { %>
+    <% if (invoice.status !== 'CANCELLED') { %>
+      <a href="/invoices/<%= invoice.id %>/edit" class="btn btn-outline-primary"><i class="icon-edit"></i> Edit</a>
+    <% } %>
+    <% if (invoice.balance > 0 && invoice.status !== 'CANCELLED') { %>
       <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#paymentModal">Record Payment</button>
     <% } %>
     <button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="icon-printer"></i> Print (Ctrl+P)</button>

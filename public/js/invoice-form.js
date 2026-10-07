@@ -63,7 +63,7 @@
       row.querySelector(".product-id-input").value = "";
       clearTimeout(acDebounce);
       const q = nameInput.value.trim();
-      if (q.length < 2) {
+      if (q.length < 1) {
         menu.innerHTML = "";
         return;
       }

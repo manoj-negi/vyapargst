@@ -47,7 +47,7 @@
       <select name="customerId" class="form-select form-select-sm">
         <option value="">All Customers</option>
         <% customers.forEach(function(c) { %>
-          <option value="<%= c.id %>" <%= filters.customerId === c.id ? 'selected' : '' %>><%= c.name %></option>
+          <option value="<%= c.id %>" <%= filters.customerId === c.id ? 'selected' : '' %>><%= c.name %><%= c.section ? ' (' + c.section + ')' : '' %></option>
         <% }) %>
       </select>
     </div>
@@ -99,6 +99,9 @@
             </td>
             <td class="d-flex gap-1">
               <a href="/invoices/<%= inv.id %>" class="btn btn-sm btn-outline-secondary">View</a>
+              <% if (inv.status !== 'CANCELLED') { %>
+                <a href="/invoices/<%= inv.id %>/edit" class="btn btn-sm btn-outline-primary">Edit</a>
+              <% } %>
               <a href="/invoices/<%= inv.id %>/pdf" class="btn btn-sm btn-outline-secondary">PDF</a>
             </td>
           </tr>
