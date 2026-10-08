@@ -5,7 +5,8 @@
   <title>Invoice <%= invoice.invoiceNo %></title>
   <style>
     @page { size: A4; margin: 0; }
-    body { margin: 0; }
+    html, body { margin: 0; padding: 0; height: 100vh; overflow: hidden; box-sizing: border-box; display: flex; flex-direction: column; }
+    .invoice-doc { max-width: 100% !important; height: 100vh !important; border: none !important; margin: 0 !important; overflow: hidden; box-sizing: border-box; }
   </style>
 </head>
 <body>
