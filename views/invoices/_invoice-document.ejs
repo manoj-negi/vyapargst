@@ -102,7 +102,7 @@
         <th class="num">Quantity</th>
         <th class="num">Unit</th>
         <th class="num">Price/Unit(₹)</th>
-        <% if (hasLineDiscount) { %><th class="num">Discount</th><% } %>
+        <% if (hasLineDiscount) { %><th class="num">Discount(₹)</th><% } %>
         <th class="num">GST(₹)</th>
         <th class="num">Amount(₹)</th>
       </tr>
@@ -117,7 +117,17 @@
           <td class="num"><%= item.unit || '' %></td>
           <td class="num"><%= formatMoney(item.rate) %></td>
           <% if (hasLineDiscount) { %>
-            <td class="num"><%= Number(item.discount) > 0 ? (item.discountType === 'PERCENTAGE' ? Number(item.discount) + '%' : '₹ ' + formatMoney(item.discount)) : '' %></td>
+            <td class="num">
+              <% if (Number(item.discount) > 0) { %>
+                <% if (item.discountType === 'PERCENTAGE') { %>
+                  ₹ <%= formatMoney(Number(item.quantity) * Number(item.rate) * Number(item.discount) / 100) %> (<%= Number(item.discount) %>%)
+                <% } else { %>
+                  ₹ <%= formatMoney(item.discount) %>
+                <% } %>
+              <% } else { %>
+                ₹ 0.00 (0%)
+              <% } %>
+            </td>
           <% } %>
           <td class="num">₹ <%= formatMoney(Number(item.cgst) + Number(item.sgst) + Number(item.igst)) %><br>(<%= Number(item.taxRate).toFixed(1) %>%)</td>
           <td class="num">₹ <%= formatMoney(item.finalAmount) %></td>
@@ -209,7 +219,7 @@
             if (Number(invoice.roundOff) < 0) totalSavings += Math.abs(Number(invoice.roundOff));
           %>
           <% if (totalSavings > 0) { %>
-          <tr style="color: #16a34a; font-weight: 600;">
+          <tr style="font-weight: 600;">
             <td style="border-bottom:none;">Total You Saved</td><td class="sep" style="border-bottom:none;">:</td><td class="num" style="border-bottom:none;">₹ <%= formatMoney(totalSavings) %></td>
           </tr>
           <% } %>
