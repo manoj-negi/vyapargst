@@ -28,11 +28,8 @@ export async function renderInvoicePdf(templateData: Record<string, unknown>): P
   const page = await browser.newPage();
   try {
     await page.setContent(html, { waitUntil: "networkidle0" });
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: { top: "12mm", bottom: "12mm", left: "10mm", right: "10mm" },
-    });
+    // Page size and margins come from the template's @page rule, shared with browser printing.
+    const pdfBuffer = await page.pdf({ printBackground: true, preferCSSPageSize: true });
     return Buffer.from(pdfBuffer);
   } finally {
     await page.close();

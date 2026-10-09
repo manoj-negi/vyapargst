@@ -356,4 +356,6 @@ a { text-decoration: none; color: inherit; }
 @media print {
   .sidebar, .topbar, .no-print { display: none !important; }
   .main-content { padding: 0 !important; }
+  body { background: #fff !important; }
+  .card:has(> .invoice-doc) { border: none !important; box-shadow: none !important; }
 }

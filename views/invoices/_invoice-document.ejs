@@ -1,8 +1,28 @@
 <style>
-  .invoice-doc { font-family: "Segoe UI", Roboto, "DejaVu Sans", "Noto Sans", Arial, sans-serif; color: #2f3542; font-size: 12px; background: #fff; padding: 24px; max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; min-height: 1160px; }
+  .invoice-doc { font-family: "Segoe UI", Roboto, "DejaVu Sans", "Noto Sans", Arial, sans-serif; color: #2f3542; font-size: 12px; background: #fff; padding: 24px; max-width: 820px; margin: 0 auto; }
   .invoice-doc * { box-sizing: border-box; }
   .invoice-doc .doc-title { text-align: center; font-size: 24px; font-weight: 700; margin: 0 0 14px; }
-  .invoice-doc .main-frame { border: 1.5px solid #3b4253; flex: 1; display: flex; flex-direction: column; }
+
+  /* The whole document is one outer table so the browser repeats its thead (title + business
+     header) on every printed page. Its height is one page, so a short invoice still fills the
+     sheet; a long one simply grows past it. */
+  .invoice-doc table.doc-layout { height: 1110px; }
+  .invoice-doc table.doc-layout > * > tr > td { border: none; padding: 0; }
+  .invoice-doc .doc-layout > tbody > tr > td { height: 100%; }
+  .invoice-doc .biz-frame { border: 1.5px solid #3b4253; border-bottom: none; }
+  /* clone: each printed page's slice of the frame gets its own bottom border */
+  .invoice-doc .main-frame { border: 1.5px solid #3b4253; border-top: none; box-decoration-break: clone; -webkit-box-decoration-break: clone; min-height: 100%; display: flex; flex-direction: column; }
+  .invoice-doc .items tbody tr { break-inside: avoid; }
+  /* Tax summary, totals and bank details are never split; if they don't fit after the items
+     they move to the next page together. */
+  .invoice-doc .closing { break-inside: avoid; }
+
+  @page { size: A4; margin: 10mm; }
+  @media print {
+    .invoice-doc { padding: 0; max-width: none; }
+    .invoice-doc table.doc-layout { height: 276mm; }
+    .invoice-doc .shade, .invoice-doc th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
   .invoice-doc .main-frame table { border-left: none; border-right: none; margin: 0; }
   .invoice-doc .main-frame table tr td:first-child, .invoice-doc .main-frame table tr th:first-child { border-left: none; }
   .invoice-doc .main-frame table tr td:last-child, .invoice-doc .main-frame table tr th:last-child { border-right: none; }
@@ -26,8 +46,8 @@
   .invoice-doc .bill-bottom { display: flex; gap: 12px; margin-top: 10px; }
   .invoice-doc .bill-bottom > div { flex: 1; }
 
-  .invoice-doc .items-wrapper { flex: 1; display: flex; flex-direction: column; }
-  .invoice-doc .items { width: 100%; flex: 1; border-collapse: collapse; }
+  .invoice-doc .items-wrapper { flex: 1 0 auto; display: flex; flex-direction: column; }
+  .invoice-doc .items { width: 100%; flex: 1 0 auto; border-collapse: collapse; }
   .invoice-doc .items tbody td { border-top: none; border-bottom: none; }
   .invoice-doc .items th { background: #f3f4f6; border-bottom: 1px solid #3b4253; }
   .invoice-doc .items .total-row td { font-weight: 700; border-top: 1px solid #3b4253; border-bottom: 1px solid #3b4253; }
@@ -46,9 +66,11 @@
 
 <% var intra = invoice.taxType === 'INTRA_STATE'; %>
 <div class="invoice-doc">
+<table class="doc-layout">
+  <thead><tr><td>
   <div class="doc-title">Tax Invoice</div>
 
-  <div class="main-frame">
+  <div class="biz-frame">
     <div class="biz">
       <% if (business.logoPath) { %><img src="<%= business.logoPath %>" class="biz-logo" alt="Logo"><% } %>
       <div style="flex:1;">
@@ -62,6 +84,10 @@
         </div>
       </div>
     </div>
+  </div>
+  </td></tr></thead>
+  <tbody><tr><td>
+  <div class="main-frame">
 
     <table class="meta">
       <tr class="label-row">
@@ -153,6 +179,7 @@
   </table>
   </div>
 
+  <div class="closing">
   <table class="summary" style="border-top:none;">
     <tr>
       <td style="width:68%; border-right:1px solid #3b4253;">
@@ -255,4 +282,7 @@
     </tr>
   </table>
   </div>
+  </div>
+  </td></tr></tbody>
+</table>
 </div>
