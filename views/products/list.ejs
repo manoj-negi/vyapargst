@@ -138,5 +138,57 @@
     });
   })();
 </script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const filterForm = document.getElementById('filterForm');
+    const tbody = document.querySelector('.table-app tbody');
+    if (!filterForm || !tbody) return;
+
+    let debounceTimer;
+    let latestAbortController;
+
+    const fetchResults = async () => {
+      if (latestAbortController) latestAbortController.abort();
+      latestAbortController = new AbortController();
+
+      const url = new URL(filterForm.action, window.location.origin);
+      const formData = new FormData(filterForm);
+      for (const [key, value] of formData.entries()) {
+        url.searchParams.append(key, value);
+      }
+
+      try {
+        const response = await fetch(url, { signal: latestAbortController.signal });
+        if (!response.ok) return;
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const newTbody = doc.querySelector('.table-app tbody');
+        if (newTbody) {
+          tbody.innerHTML = newTbody.innerHTML;
+        }
+        
+        window.history.replaceState({}, '', url);
+      } catch (err) {
+        if (err.name !== 'AbortError') console.error('Filter fetch error:', err);
+      }
+    };
+
+    filterForm.querySelectorAll('input, select').forEach(input => {
+      if (input.type === 'text') {
+        input.addEventListener('input', () => {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(fetchResults, 250);
+        });
+      } else {
+        input.addEventListener('change', fetchResults);
+      }
+    });
+    
+    // Hide the filter button since filtering is now automatic
+    const filterBtn = filterForm.querySelector('button[type="submit"]');
+    if (filterBtn) filterBtn.parentElement.style.display = 'none';
+  });
+</script>
 
 <%- include('../partials/layout-end') %>

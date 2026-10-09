@@ -204,8 +204,8 @@
           <% if (Number(invoice.discount) > 0) { %>
             <tr><td>Discount</td><td class="sep">:</td><td class="num">- ₹ <%= formatMoney(invoice.discount) %></td></tr>
           <% } %>
-          <% if (Number(invoice.roundOff) !== 0) { %>
-            <tr><td>Round Off</td><td class="sep">:</td><td class="num">₹ <%= formatMoney(invoice.roundOff) %></td></tr>
+          <% if (Math.abs(Number(invoice.roundOff)) > 0.001) { %>
+            <tr><td>Round Off</td><td class="sep">:</td><td class="num"><%= Number(invoice.roundOff) > 0 ? '+' : '-' %> ₹ <%= formatMoney(Math.abs(Number(invoice.roundOff))) %></td></tr>
           <% } %>
           <tr style="font-weight:700;"><td>Total</td><td class="sep">:</td><td class="num">₹ <%= formatMoney(invoice.total) %></td></tr>
           <tr><td colspan="3" class="shade">Invoice Amount In Words :</td></tr>
@@ -214,9 +214,19 @@
           <tr><td style="border-bottom:none;">Balance</td><td class="sep" style="border-bottom:none;">:</td><td class="num" style="border-bottom:none;">₹ <%= formatMoney(invoice.balance) %></td></tr>
           <%
             var totalSavings = 0;
-            if (invoice.items) { invoice.items.forEach(function(i) { totalSavings += Number(i.discount || 0); }); }
+            if (invoice.items) { 
+              invoice.items.forEach(function(i) { 
+                if (i.discountType === 'PERCENTAGE') {
+                  totalSavings += (Number(i.quantity) * Number(i.rate) * Number(i.discount || 0)) / 100;
+                } else {
+                  totalSavings += Number(i.discount || 0);
+                }
+              }); 
+            }
             totalSavings += Number(invoice.discount || 0);
-            if (Number(invoice.roundOff) < 0) totalSavings += Math.abs(Number(invoice.roundOff));
+            if (Number(invoice.roundOff) < 0) {
+              totalSavings += Math.abs(Number(invoice.roundOff));
+            }
           %>
           <% if (totalSavings > 0) { %>
           <tr style="font-weight: 600;">
