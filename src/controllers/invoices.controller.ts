@@ -116,7 +116,7 @@ export async function createInvoice(req: Request, res: Response) {
 
   const intra = isIntraState(business.state, customer.state);
 
-  // Re-derive HSN/GST rate authoritatively from the live Product + Tax Master for catalog
+  // Re-derive HSN/GST rate/price type authoritatively from the live Product + Tax Master for catalog
   // items — never trust rate/HSN submitted by the browser. Quantity/price/discount are
   // legitimate user overrides and are validated (positive qty, non-negative price/discount).
   const enrichedItems = await Promise.all(
@@ -131,6 +131,7 @@ export async function createInvoice(req: Request, res: Response) {
         ...item,
         hsn: product.hsnCode || item.hsn,
         gstRate: product.tax ? Number(product.tax.rate) : 0,
+        priceType: product.priceType,
       };
     })
   );
@@ -296,18 +297,25 @@ export async function showEditInvoice(req: Request, res: Response) {
   const business = res.locals.business;
   const invoice = await prisma.saleInvoice.findFirst({
     where: { id: req.params.id, businessId: business.id },
-    include: { items: true },
+    include: { items: { include: { product: { select: { priceType: true } } } } },
   });
 
   if (!invoice) throw new AppError("Invoice not found", 404);
   if (invoice.status === "CANCELLED") throw new AppError("Cannot edit a cancelled invoice", 400);
+
+  // Line items don't snapshot the price type, so the edit form needs the product's
+  // With Tax / Without Tax setting — otherwise inclusive rates get GST added again.
+  const items = invoice.items.map(({ product, ...item }) => ({
+    ...item,
+    priceType: product?.priceType ?? "EXCLUSIVE",
+  }));
 
   const customers = await prisma.customer.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" } });
 
   res.render("invoices/form", {
     title: `Edit Invoice ${invoice.invoiceNo}`,
     activeNav: "invoices",
-    invoice,
+    invoice: { ...invoice, items },
     customers,
     states: INDIAN_STATES,
     errors: null,
@@ -356,6 +364,7 @@ export async function updateInvoice(req: Request, res: Response) {
         ...item,
         hsn: product.hsnCode || item.hsn,
         gstRate: product.tax ? Number(product.tax.rate) : 0,
+        priceType: product.priceType,
       };
     })
   );

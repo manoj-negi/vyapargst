@@ -308,6 +308,7 @@
       row.querySelector(".unit-display").textContent = item.unit || "-";
       row.querySelector(".qty-input").value = item.quantity;
       row.querySelector(".price-input").value = item.rate;
+      row.querySelector(".price-type-input").value = item.priceType || "EXCLUSIVE";
       row.querySelector(".discount-input").value = item.discount;
       row.querySelector(".discount-type-select").value = item.discountType;
       row.querySelector(".gst-rate-input").value = item.taxRate;
