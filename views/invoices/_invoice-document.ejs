@@ -1,5 +1,5 @@
 <style>
-  .invoice-doc { font-family: "Segoe UI", Roboto, "DejaVu Sans", "Noto Sans", Arial, sans-serif; color: #2f3542; font-size: 12px; background: #fff; padding: 24px; max-width: 820px; margin: 0 auto; }
+  .invoice-doc { font-family: "Segoe UI", Roboto, "DejaVu Sans", "Noto Sans", Arial, sans-serif; color: #2f3542; font-size: 12px; line-height: 1.5; background: #fff; padding: 24px; max-width: 820px; margin: 0 auto; }
   .invoice-doc * { box-sizing: border-box; }
   .invoice-doc .doc-title { text-align: center; font-size: 24px; font-weight: 700; margin: 0 0 14px; }
 
@@ -19,7 +19,8 @@
 
   @page { size: A4; margin: 10mm; }
   @media print {
-    .invoice-doc { padding: 0; max-width: none; }
+    /* A frame border exactly on the printable edge gets clipped by the printer, so inset it */
+    .invoice-doc { padding: 0 3px; max-width: none; }
     .invoice-doc table.doc-layout { height: 276mm; }
     .invoice-doc .shade, .invoice-doc th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
