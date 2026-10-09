@@ -122,7 +122,13 @@
         <div class="sale-receipt-row col-cgst-sgst"><span>SGST</span><span id="sgstDisplay">₹0.00</span></div>
         <div class="sale-receipt-row col-igst d-none"><span>IGST</span><span id="igstDisplay">₹0.00</span></div>
         <div class="sale-receipt-row"><span>CESS</span><span id="cessDisplay">₹0.00</span></div>
-        <div class="sale-receipt-row"><span>Round Off</span><span id="roundOffDisplay">₹0.00</span></div>
+        <div class="sale-receipt-row align-items-center">
+          <span>Round Off</span>
+          <div class="d-flex align-items-center gap-2">
+            <input type="number" name="manualRoundOff" id="manualRoundOffValue" class="form-control form-control-sm text-end" style="width: 80px;" placeholder="Auto" step="0.01">
+            <span id="roundOffDisplay">₹0.00</span>
+          </div>
+        </div>
         <div class="sale-receipt-total">
           <span>Total</span>
           <span id="grandTotalDisplay">₹0.00</span>

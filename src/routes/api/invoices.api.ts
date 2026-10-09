@@ -22,6 +22,7 @@ const calcSchema = z.object({
   invoiceDiscount: z
     .object({ value: z.coerce.number().min(0).default(0), type: z.enum(["PERCENTAGE", "FIXED"]).default("PERCENTAGE") })
     .optional(),
+  manualRoundOff: z.coerce.number().optional(),
 });
 
 /**
@@ -55,7 +56,8 @@ invoicesApiRouter.post("/api/invoices/calculate", (req, res) => {
   const totals = calculateInvoiceTotals({
     lines,
     invoiceDiscount: data.invoiceDiscount,
-    roundOffMode: business.settings?.roundOffMode || "AUTOMATIC",
+    roundOffMode: data.manualRoundOff !== undefined && !isNaN(data.manualRoundOff) ? "MANUAL" : (business.settings?.roundOffMode || "AUTOMATIC"),
+    manualRoundOff: data.manualRoundOff,
   });
 
   res.json({

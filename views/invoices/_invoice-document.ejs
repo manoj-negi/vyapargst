@@ -1,8 +1,11 @@
 <style>
-  .invoice-doc { font-family: "Segoe UI", Roboto, "DejaVu Sans", "Noto Sans", Arial, sans-serif; color: #2f3542; font-size: 12px; background: #fff; padding: 24px; max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; min-height: 100%; }
+  .invoice-doc { font-family: "Segoe UI", Roboto, "DejaVu Sans", "Noto Sans", Arial, sans-serif; color: #2f3542; font-size: 12px; background: #fff; padding: 24px; max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; min-height: 1160px; }
   .invoice-doc * { box-sizing: border-box; }
   .invoice-doc .doc-title { text-align: center; font-size: 24px; font-weight: 700; margin: 0 0 14px; }
-  .invoice-doc .frame { border: 1.5px solid #3b4253; }
+  .invoice-doc .main-frame { border: 1.5px solid #3b4253; flex: 1; display: flex; flex-direction: column; }
+  .invoice-doc .main-frame table { border-left: none; border-right: none; margin: 0; }
+  .invoice-doc .main-frame table tr td:first-child, .invoice-doc .main-frame table tr th:first-child { border-left: none; }
+  .invoice-doc .main-frame table tr td:last-child, .invoice-doc .main-frame table tr th:last-child { border-right: none; }
   .invoice-doc table { width: 100%; border-collapse: collapse; }
   .invoice-doc td, .invoice-doc th { border: 1px solid #3b4253; padding: 4px 6px; vertical-align: top; }
   .invoice-doc th { text-align: left; font-weight: 700; }
@@ -23,8 +26,8 @@
   .invoice-doc .bill-bottom { display: flex; gap: 12px; margin-top: 10px; }
   .invoice-doc .bill-bottom > div { flex: 1; }
 
-  .invoice-doc .items-wrapper { flex: 1; margin-top: 8px; display: flex; flex-direction: column; }
-  .invoice-doc .items { width: 100%; height: 100%; border-collapse: collapse; }
+  .invoice-doc .items-wrapper { flex: 1; display: flex; flex-direction: column; }
+  .invoice-doc .items { width: 100%; flex: 1; border-collapse: collapse; }
   .invoice-doc .items tbody td { border-top: none; border-bottom: none; }
   .invoice-doc .items th { background: #f3f4f6; border-bottom: 1px solid #3b4253; }
   .invoice-doc .items .total-row td { font-weight: 700; border-top: 1px solid #3b4253; border-bottom: 1px solid #3b4253; }
@@ -37,7 +40,7 @@
   .invoice-doc .totals td { border-left: none; border-right: none; }
   .invoice-doc .totals .sep { width: 16px; text-align: center; }
 
-  .invoice-doc .footer { margin-top: 8px; }
+  .invoice-doc .footer { border-top: 1px solid #3b4253; }
   .invoice-doc .sign-box { width: 140px; height: 50px; border: 1px solid #9ca3af; margin: 24px auto 4px; }
 </style>
 
@@ -45,7 +48,7 @@
 <div class="invoice-doc">
   <div class="doc-title">Tax Invoice</div>
 
-  <div class="frame">
+  <div class="main-frame">
     <div class="biz">
       <% if (business.logoPath) { %><img src="<%= business.logoPath %>" class="biz-logo" alt="Logo"><% } %>
       <div style="flex:1;">
@@ -89,10 +92,8 @@
         </td>
       </tr>
     </table>
-  </div>
-
   <div class="items-wrapper">
-  <table class="items frame">
+  <table class="items">
     <thead>
       <tr>
         <th style="width:28px;">#</th>
@@ -142,7 +143,7 @@
   </table>
   </div>
 
-  <table class="summary frame" style="border-top:none;">
+  <table class="summary" style="border-top:none;">
     <tr>
       <td style="width:68%; border-right:1px solid #3b4253;">
         <table class="tax-table">
@@ -201,12 +202,23 @@
           <tr><td colspan="3"><%= amountInWords %></td></tr>
           <tr><td>Received</td><td class="sep">:</td><td class="num">₹ <%= formatMoney(invoice.receivedAmount) %></td></tr>
           <tr><td style="border-bottom:none;">Balance</td><td class="sep" style="border-bottom:none;">:</td><td class="num" style="border-bottom:none;">₹ <%= formatMoney(invoice.balance) %></td></tr>
+          <%
+            var totalSavings = 0;
+            if (invoice.items) { invoice.items.forEach(function(i) { totalSavings += Number(i.discount || 0); }); }
+            totalSavings += Number(invoice.discount || 0);
+            if (Number(invoice.roundOff) < 0) totalSavings += Math.abs(Number(invoice.roundOff));
+          %>
+          <% if (totalSavings > 0) { %>
+          <tr style="color: #16a34a; font-weight: 600;">
+            <td style="border-bottom:none;">Total You Saved</td><td class="sep" style="border-bottom:none;">:</td><td class="num" style="border-bottom:none;">₹ <%= formatMoney(totalSavings) %></td>
+          </tr>
+          <% } %>
         </table>
       </td>
     </tr>
   </table>
 
-  <table class="footer frame">
+  <table class="footer">
     <tr>
       <td class="shade" style="width:50%;">Bank Details:</td>
       <td class="shade">For <%= business.name.toUpperCase() %>:</td>
@@ -222,4 +234,5 @@
       </td>
     </tr>
   </table>
+  </div>
 </div>

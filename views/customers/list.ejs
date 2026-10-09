@@ -25,7 +25,7 @@
         <% } %>
         <% customers.forEach(function(c) { %>
           <tr>
-            <td><a href="/customers/<%= c.id %>/edit" class="fw-semibold"><%= c.name %></a></td>
+            <td><a href="/customers/<%= c.id %>/edit" class="fw-semibold"><%= c.name %><%= c.section ? ' (' + c.section + ')' : '' %></a></td>
             <td><%= c.phone || '-' %></td>
             <td><%= c.gstin || '-' %></td>
             <td><%= c.customerType %></td>

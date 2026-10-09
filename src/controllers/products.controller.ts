@@ -129,6 +129,7 @@ export async function listProducts(req: Request, res: Response) {
   const where: Record<string, unknown> = {
     businessId: business.id,
     isService: type === "service",
+    isActive: true,
   };
 
   if (q) {
@@ -214,6 +215,21 @@ export async function createProduct(req: Request, res: Response) {
   }
 
   const data = parsed.data;
+
+  const duplicate = await prisma.product.findFirst({
+    where: { businessId: business.id, name: { equals: data.name, mode: "insensitive" }, isActive: true }
+  });
+  if (duplicate) {
+    const options = await loadFormOptions(business.id);
+    return res.status(422).render("products/form", {
+      title: "Add Item",
+      activeNav: "products",
+      product: req.body,
+      errors: ["An item with this name already exists."],
+      ...options,
+    });
+  }
+
   const productData = await buildProductData(business.id, data, uploadedImagePath(req));
 
   await prisma.product.create({
@@ -246,6 +262,26 @@ export async function updateProduct(req: Request, res: Response) {
   }
 
   const data = parsed.data;
+
+  const duplicate = await prisma.product.findFirst({
+    where: { 
+      businessId: business.id, 
+      name: { equals: data.name, mode: "insensitive" }, 
+      id: { not: existing.id },
+      isActive: true
+    }
+  });
+  if (duplicate) {
+    const options = await loadFormOptions(business.id);
+    return res.status(422).render("products/form", {
+      title: "Edit Item",
+      activeNav: "products",
+      product: { ...existing, ...req.body },
+      errors: ["An item with this name already exists."],
+      ...options,
+    });
+  }
+
   const productData = await buildProductData(business.id, data, uploadedImagePath(req));
 
   // Opening stock is fixed at creation; only stock adjustments should change currentStock afterward.

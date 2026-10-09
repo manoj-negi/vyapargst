@@ -16,7 +16,7 @@
 </div>
 
 <div class="card p-3 mb-3">
-  <form method="GET" action="/products" class="row g-2 align-items-end">
+  <form method="GET" action="/products" class="row g-2 align-items-end" id="filterForm">
     <input type="hidden" name="type" value="<%= filters.type %>">
     <div class="col-md-4">
       <label class="form-label small fw-semibold mb-1">Search</label>
@@ -93,8 +93,11 @@
             <td>
               <span class="status-badge <%= p.isActive ? 'status-paid' : 'status-unpaid' %>"><%= p.isActive ? 'Active' : 'Inactive' %></span>
             </td>
-            <td>
+            <td class="d-flex gap-1">
               <a href="/products/<%= p.id %>/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
+              <form method="POST" action="/products/<%= p.id %>/delete" onsubmit="return confirm('Are you sure you want to delete this item?');" style="margin:0;">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
             </td>
           </tr>
         <% }) %>
@@ -102,5 +105,38 @@
     </table>
   </div>
 </div>
+
+<script>
+  (function() {
+    const filterForm = document.getElementById('filterForm');
+    const tableBody = document.querySelector('.table-app tbody');
+    let debounceTimer;
+    let currentRequestId = 0;
+
+    filterForm.addEventListener('input', function() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const requestId = ++currentRequestId;
+        const url = new URL(filterForm.action, window.location.origin);
+        const params = new URLSearchParams(new FormData(filterForm));
+        url.search = params.toString();
+
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+          .then(res => res.text())
+          .then(html => {
+            if (requestId !== currentRequestId) return; // Prevent older response from replacing newer one
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newTbody = doc.querySelector('.table-app tbody');
+            if (newTbody && tableBody) {
+              tableBody.innerHTML = newTbody.innerHTML;
+            }
+            window.history.replaceState({}, '', url);
+          })
+          .catch(err => console.error("Filter error:", err));
+      }, 250);
+    });
+  })();
+</script>
 
 <%- include('../partials/layout-end') %>

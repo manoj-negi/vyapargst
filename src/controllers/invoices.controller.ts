@@ -32,6 +32,7 @@ const invoiceSchema = z.object({
   invoiceDiscountType: z.enum(["PERCENTAGE", "FIXED"]).default("PERCENTAGE"),
   paymentType: z.enum(["CASH", "UPI", "BANK_TRANSFER", "CARD", "CREDIT", "OTHER"]).default("CASH"),
   receivedAmount: z.coerce.number().min(0).default(0),
+  manualRoundOff: z.preprocess((v) => (v === "" || v === null ? undefined : v), z.coerce.number().optional()),
 });
 
 export async function listInvoices(req: Request, res: Response) {
@@ -157,7 +158,8 @@ export async function createInvoice(req: Request, res: Response) {
   const totals = calculateInvoiceTotals({
     lines: lineResults,
     invoiceDiscount: { value: data.invoiceDiscountValue, type: data.invoiceDiscountType },
-    roundOffMode: settings.roundOffMode,
+    roundOffMode: data.manualRoundOff !== undefined && !isNaN(data.manualRoundOff) ? "MANUAL" : (settings.roundOffMode || "AUTOMATIC"),
+    manualRoundOff: data.manualRoundOff,
   });
 
   const invoiceDate = data.invoiceDate ? new Date(data.invoiceDate) : new Date();
@@ -378,7 +380,8 @@ export async function updateInvoice(req: Request, res: Response) {
   const totals = calculateInvoiceTotals({
     lines: lineResults,
     invoiceDiscount: { value: data.invoiceDiscountValue, type: data.invoiceDiscountType },
-    roundOffMode: settings.roundOffMode,
+    roundOffMode: data.manualRoundOff !== undefined && !isNaN(data.manualRoundOff) ? "MANUAL" : (settings.roundOffMode || "AUTOMATIC"),
+    manualRoundOff: data.manualRoundOff,
   });
 
   const invoiceDate = data.invoiceDate ? new Date(data.invoiceDate) : invoice.invoiceDate;

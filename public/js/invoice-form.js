@@ -7,6 +7,7 @@
   const invoiceDiscountValue = document.getElementById("invoiceDiscountValue");
   const invoiceDiscountType = document.getElementById("invoiceDiscountType");
   const receivedInput = document.getElementById("receivedInput");
+  const manualRoundOffValue = document.getElementById("manualRoundOffValue");
   const balanceDisplay = document.getElementById("balanceDisplay");
   const paymentStatusBadge = document.getElementById("paymentStatusBadge");
   const form = document.getElementById("invoiceForm");
@@ -192,6 +193,7 @@
         value: Number(invoiceDiscountValue.value || 0),
         type: invoiceDiscountType.value,
       },
+      manualRoundOff: document.getElementById('manualRoundOffValue') && document.getElementById('manualRoundOffValue').value !== "" ? Number(document.getElementById('manualRoundOffValue').value) : undefined,
     };
   }
 
@@ -288,6 +290,7 @@
   customerSelect.addEventListener("change", scheduleRecalc);
   invoiceDiscountValue.addEventListener("input", scheduleRecalc);
   invoiceDiscountType.addEventListener("change", scheduleRecalc);
+  if (manualRoundOffValue) manualRoundOffValue.addEventListener("input", scheduleRecalc);
   receivedInput.addEventListener("input", () => {
     const total = Number(document.getElementById("grandTotalHidden").value || 0);
     updatePaymentStatus(total);
