@@ -129,7 +129,7 @@
               <% } %>
             </td>
           <% } %>
-          <td class="num">₹ <%= formatMoney(Number(item.cgst) + Number(item.sgst) + Number(item.igst)) %><br>(<%= Number(item.taxRate).toFixed(1) %>%)</td>
+          <td class="num">₹ <%= formatMoney(Number(item.cgst) + Number(item.sgst) + Number(item.igst)) %><br>(<%= Number(item.taxRate) === 0 ? 'Exempt' : Number(item.taxRate).toFixed(1) + '%' %>)</td>
           <td class="num">₹ <%= formatMoney(item.finalAmount) %></td>
         </tr>
       <% }) %>

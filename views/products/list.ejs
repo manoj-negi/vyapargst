@@ -81,7 +81,7 @@
             <td><%= p.unit ? p.unit.name : '-' %></td>
             <td>₹<%= Number(p.salePrice).toFixed(2) %></td>
             <td><%= p.purchasePrice ? '₹' + Number(p.purchasePrice).toFixed(2) : '-' %></td>
-            <td><%= p.tax ? p.tax.rate + '%' : '-' %></td>
+            <td><%= p.tax ? p.tax.rate + '%' : 'Exempt' %></td>
             <td>
               <%= Number(p.currentStock) %>
               <% if (Number(p.currentStock) <= 0) { %>

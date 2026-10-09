@@ -6,8 +6,8 @@
   var secondaryUnitName = product ? (product.secondaryUnitName || (product.secondaryUnit ? product.secondaryUnit.name : '')) : '';
   var openingStockDate = product && product.openingStockDate ? new Date(product.openingStockDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
   function priceTypeOptions(selected) {
-    return '<option value="EXCLUSIVE"' + (selected !== 'INCLUSIVE' ? ' selected' : '') + '>Without Tax</option>' +
-           '<option value="INCLUSIVE"' + (selected === 'INCLUSIVE' ? ' selected' : '') + '>With Tax</option>';
+    return '<option value="INCLUSIVE"' + (selected !== 'EXCLUSIVE' ? ' selected' : '') + '>With Tax</option>' +
+           '<option value="EXCLUSIVE"' + (selected === 'EXCLUSIVE' ? ' selected' : '') + '>Without Tax</option>';
   }
 %>
 
@@ -129,10 +129,11 @@
           <div class="col-md-6">
             <label class="form-label small fw-semibold">GST Rate</label>
             <select id="gstRateSelect" name="taxId" class="form-select">
-              <option value="">No GST</option>
+              <option value="" disabled <%= !product || !product.taxId ? 'selected' : '' %>>Select GST Rate</option>
               <% taxes.forEach(function(t) { %>
                 <option value="<%= t.id %>" data-rate="<%= t.rate %>" <%= product && product.taxId === t.id ? 'selected' : '' %>><%= t.name %> (<%= t.rate %>%)</option>
               <% }) %>
+              <option value="" <%= product && product.taxId === null ? 'selected' : (!product || !product.taxId ? '' : '') %>>Exempt</option>
             </select>
           </div>
         </div>

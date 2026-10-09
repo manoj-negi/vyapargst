@@ -139,7 +139,7 @@
     row.querySelector(".price-input").value = Number(product.salePrice).toFixed(2);
     row.querySelector(".price-type-input").value = product.priceType || "EXCLUSIVE";
     row.querySelector(".gst-rate-input").value = product.gstRate || 0;
-    row.querySelector(".gst-rate-cell-label").textContent = `${product.gstRate || 0}%`;
+    row.querySelector(".gst-rate-cell-label").textContent = Number(product.gstRate || 0) === 0 ? 'Exempt' : `${product.gstRate || 0}%`;
     if (product.defaultDiscount != null) {
       row.querySelector(".discount-input").value = Number(product.defaultDiscount).toFixed(2);
       row.querySelector(".discount-type-select").value = product.defaultDiscountType || "PERCENTAGE";
@@ -311,7 +311,7 @@
       row.querySelector(".discount-input").value = item.discount;
       row.querySelector(".discount-type-select").value = item.discountType;
       row.querySelector(".gst-rate-input").value = item.taxRate;
-      row.querySelector(".gst-rate-cell-label").textContent = `${item.taxRate}%`;
+      row.querySelector(".gst-rate-cell-label").textContent = Number(item.taxRate) === 0 ? 'Exempt' : `${item.taxRate}%`;
     });
   } else {
     addRow();
