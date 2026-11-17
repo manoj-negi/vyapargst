@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { prisma } from "../../lib/prisma";
 import { requireBusiness } from "../../middleware/auth";
+import { quickCreateProduct } from "../../controllers/products.controller";
 
 export const productsApiRouter = Router();
 
-productsApiRouter.use(requireBusiness);
+productsApiRouter.use("/api", requireBusiness);
 
 /** Item-name autocomplete used by the Sale Invoice line-item table. */
 productsApiRouter.get("/api/products/search", async (req, res) => {
@@ -37,6 +38,9 @@ productsApiRouter.get("/api/products/search", async (req, res) => {
       unitName: p.unit?.name || "",
       salePrice: p.salePrice,
       priceType: p.priceType,
+      purchasePrice: p.purchasePrice,
+      purchasePriceType: p.purchasePriceType,
+      isService: p.isService,
       gstRate: p.tax ? Number(p.tax.rate) : 0,
       defaultDiscount: p.defaultDiscount,
       defaultDiscountType: p.defaultDiscountType,
@@ -44,3 +48,5 @@ productsApiRouter.get("/api/products/search", async (req, res) => {
     })),
   });
 });
+
+productsApiRouter.post("/api/products", quickCreateProduct);

@@ -14,7 +14,7 @@
     else if (pages[pages.length - 1] !== '…') pages.push('…');
   }
 %>
-<div class="d-flex justify-content-between align-items-center p-3 border-top">
+<div class="table-pager">
   <div class="text-muted small">Showing <%= from %>–<%= to %> of <%= p.total %></div>
   <% if (p.totalPages > 1) { %>
     <nav>

@@ -1,114 +1,168 @@
-<%- include('../partials/layout-start', { title: 'Sale Invoices', activeNav: 'invoices' }) %>
+<%- include('../partials/layout-start', { title: config.pluralLabel, activeNav: config.activeNav }) %>
+<%
+  var settles = !!config.settlementDirection;
+  var paidWord = config.settlementDirection === 'OUT' ? 'Paid' : 'Received';
+  var showDept = config.side === 'SALE';
+  // Each column is shown when the listed documents use it (or it is being filtered), so an unused one takes no space
+  var divs = invoices.map(function (inv) { return divisionOf(inv); });
+  var showSectionCol = showDept && (!!filters.section || divs.some(function (d) { return d.section || d.unclassified; }));
+  var showDepartmentCol = showDept && (!!filters.department || divs.some(function (d) { return d.department; }));
+  var colCount = 6 + (showSectionCol ? 1 : 0) + (showDepartmentCol ? 1 : 0) + (settles ? 1 : 0);
+  var anyFilter = filters.customerId || filters.paymentStatus || filters.q || filters.section || filters.department || filters.from || filters.to || filters.status;
+  var createLabel = { SALE_INVOICE: 'New invoice', ESTIMATE: 'New estimate', PURCHASE_BILL: 'New purchase', CREDIT_NOTE: 'New sale return', DEBIT_NOTE: 'New purchase return' }[config.docType];
+  var actions = config.returnOf
+    ? '<a href="' + config.basePath + '/new" class="btn btn-outline-secondary">Return without a bill</a>'
+    : (config.docType === 'PURCHASE_BILL' ? '<a href="/purchases/import" class="btn btn-outline-primary"><i class="icon-sparkles"></i> Import bill with AI</a>' : '') +
+      '<a href="' + config.basePath + '/new" class="btn btn-primary"><i class="icon-plus"></i> ' + createLabel + '</a>';
+  var subtitle = config.returnOf
+    ? 'To return against a bill, open it and choose ' + (config.docType === 'CREDIT_NOTE' ? '“Sale return”.' : '“Purchase return”.')
+    : (config.docType === 'ESTIMATE' ? 'Quotations do not affect stock or balances until converted.' : null);
+%>
+<div class="page" data-list-key="<%= config.basePath %>">
+  <%- include('../partials/page-header', { title: config.pluralLabel, subtitle: subtitle, actions: actions }) %>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h5 class="fw-bold mb-0">Sale Invoices</h5>
-  <a href="/invoices/new" class="btn btn-accent"><i class="icon-plus"></i> Add Sale</a>
-</div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Total value</div><div class="kpi-value"><%= inr(summary.totalSales) %></div><div class="kpi-sub"><%= invoiceCount %> document<%= invoiceCount === 1 ? '' : 's' %><%= anyFilter ? ' (filtered)' : '' %></div></div>
+    <% if (settles) { %>
+      <div class="kpi"><div class="kpi-label"><%= paidWord %> / adjusted</div><div class="kpi-value text-success"><%= inr(summary.received) %></div></div>
+      <div class="kpi"><div class="kpi-label">Outstanding</div><div class="kpi-value <%= summary.outstanding > 0 ? 'text-danger' : '' %>"><%= inr(summary.outstanding) %></div></div>
+    <% } %>
+  </div>
 
-<div class="row g-3 mb-3">
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-label">Total Sales</div>
-      <div class="stat-value">₹<%= summary.totalSales.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-label">Received</div>
-      <div class="stat-value text-success">₹<%= summary.received.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-label">Outstanding</div>
-      <div class="stat-value text-danger">₹<%= summary.outstanding.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-label">Invoices</div>
-      <div class="stat-value"><%= invoiceCount %></div>
-    </div>
-  </div>
-</div>
+  <div class="panel">
+    <form method="GET" action="<%= config.basePath %>" class="filter-bar" role="search">
+      <div class="f f-search">
+        <label class="form-label" for="fNo">Search</label>
+        <div class="search-input"><i class="icon-search"></i><input type="search" id="fNo" name="q" class="form-control form-control-sm" placeholder="<%= showDept ? 'Number, customer, section or department' : 'Number or ' + config.partyLabel.toLowerCase() %>" value="<%= filters.q %>"></div>
+      </div>
+      <div class="f f-select-lg">
+        <label class="form-label" for="fParty"><%= config.partyLabel %></label>
+        <select id="fParty" name="customerId" class="form-select form-select-sm">
+          <option value="">All</option>
+          <% customers.forEach(function(c) { %><option value="<%= c.id %>" <%= filters.customerId === c.id ? 'selected' : '' %>><%= c.name %><%= c.section ? ' (' + c.section + ')' : '' %></option><% }) %>
+        </select>
+      </div>
+      <% if (showDept) { %>
+      <div class="f f-select">
+        <label class="form-label" for="fSection">Section</label>
+        <select id="fSection" name="section" class="form-select form-select-sm">
+          <option value="">All</option>
+          <option value="__none" <%= filters.section === '__none' ? 'selected' : '' %>>No section</option>
+          <% sections.forEach(function(d) { %><option value="<%= d %>" <%= filters.section && filters.section.toLowerCase() === d.toLowerCase() ? 'selected' : '' %>><%= d %></option><% }) %>
+        </select>
+      </div>
+      <div class="f f-select">
+        <label class="form-label" for="fDept">Department</label>
+        <select id="fDept" name="department" class="form-select form-select-sm">
+          <option value="">All</option>
+          <option value="__none" <%= filters.department === '__none' ? 'selected' : '' %>>No department</option>
+          <% departments.forEach(function(d) { %><option value="<%= d %>" <%= filters.department && filters.department.toLowerCase() === d.toLowerCase() ? 'selected' : '' %>><%= d %></option><% }) %>
+        </select>
+      </div>
+      <% } %>
+      <div class="f f-date"><label class="form-label" for="fFrom">From</label><input type="date" id="fFrom" name="from" class="form-control form-control-sm" value="<%= filters.from %>"></div>
+      <div class="f f-date"><label class="form-label" for="fTo">To</label><input type="date" id="fTo" name="to" class="form-control form-control-sm" value="<%= filters.to %>"></div>
+      <% if (settles) { %>
+      <div class="f f-select">
+        <label class="form-label" for="fPay">Payment</label>
+        <select id="fPay" name="paymentStatus" class="form-select form-select-sm">
+          <option value="">Any</option>
+          <option value="UNPAID" <%= filters.paymentStatus === 'UNPAID' ? 'selected' : '' %>>Unpaid</option>
+          <option value="PARTIALLY_PAID" <%= filters.paymentStatus === 'PARTIALLY_PAID' ? 'selected' : '' %>>Partly paid</option>
+          <option value="PAID" <%= filters.paymentStatus === 'PAID' ? 'selected' : '' %>>Paid</option>
+        </select>
+      </div>
+      <% } %>
+      <div class="f f-select">
+        <label class="form-label" for="fStatus">Show</label>
+        <select id="fStatus" name="status" class="form-select form-select-sm">
+          <option value="">Active</option>
+          <option value="CANCELLED" <%= filters.status === 'CANCELLED' ? 'selected' : '' %>>Cancelled</option>
+          <option value="ALL" <%= filters.status === 'ALL' ? 'selected' : '' %>>All</option>
+        </select>
+      </div>
+      <div class="f-actions">
+        <% if (anyFilter) { %><a href="<%= config.basePath %>" class="btn btn-sm btn-outline-secondary">Clear</a><% } %>
+        <button type="submit" class="btn btn-sm btn-primary"><i class="icon-filter"></i> Apply</button>
+      </div>
+    </form>
 
-<div class="card p-3 mb-3">
-  <form method="GET" action="/invoices" class="row g-2 align-items-end">
-    <div class="col-md-2">
-      <label class="form-label small fw-semibold mb-1">From</label>
-      <input type="date" name="from" class="form-control form-control-sm" value="<%= filters.from %>">
-    </div>
-    <div class="col-md-2">
-      <label class="form-label small fw-semibold mb-1">To</label>
-      <input type="date" name="to" class="form-control form-control-sm" value="<%= filters.to %>">
-    </div>
-    <div class="col-md-3">
-      <label class="form-label small fw-semibold mb-1">Customer</label>
-      <select name="customerId" class="form-select form-select-sm">
-        <option value="">All Customers</option>
-        <% customers.forEach(function(c) { %>
-          <option value="<%= c.id %>" <%= filters.customerId === c.id ? 'selected' : '' %>><%= c.name %><%= c.section ? ' (' + c.section + ')' : '' %></option>
-        <% }) %>
-      </select>
-    </div>
-    <div class="col-md-2">
-      <label class="form-label small fw-semibold mb-1">Payment Status</label>
-      <select name="paymentStatus" class="form-select form-select-sm">
-        <option value="">All</option>
-        <option value="PAID" <%= filters.paymentStatus === 'PAID' ? 'selected' : '' %>>Paid</option>
-        <option value="PARTIALLY_PAID" <%= filters.paymentStatus === 'PARTIALLY_PAID' ? 'selected' : '' %>>Partially Paid</option>
-        <option value="UNPAID" <%= filters.paymentStatus === 'UNPAID' ? 'selected' : '' %>>Unpaid</option>
-      </select>
-    </div>
-    <div class="col-md-2">
-      <label class="form-label small fw-semibold mb-1">Invoice No.</label>
-      <input type="text" name="invoiceNo" class="form-control form-control-sm" value="<%= filters.invoiceNo %>">
-    </div>
-    <div class="col-md-1">
-      <button type="submit" class="btn btn-sm btn-primary-app w-100">Filter</button>
-    </div>
-  </form>
-</div>
-
-<div class="card">
-  <div class="table-scroll">
-    <table class="table table-app mb-0">
-      <thead>
-        <tr><th>Date</th><th>Invoice No</th><th>Customer</th><th>Amount</th><th>Received</th><th>Balance</th><th>Status</th><th></th></tr>
-      </thead>
-      <tbody>
-        <% if (invoices.length === 0) { %>
-          <tr><td colspan="8">
-            <div class="empty-state">
-              <i class="icon-file-text"></i>
-              No invoices yet. <a href="/invoices/new">Create your first sale invoice</a>.
-            </div>
-          </td></tr>
-        <% } %>
-        <% invoices.forEach(function(inv) { %>
+    <div class="table-scroll sticky">
+      <table class="table table-app" data-sortable data-page-size="50">
+        <thead>
           <tr>
-            <td><%= new Date(inv.invoiceDate).toLocaleDateString('en-IN') %></td>
-            <td><a href="/invoices/<%= inv.id %>" class="fw-semibold"><%= inv.invoiceNo %></a></td>
-            <td><%= inv.customer.name %></td>
-            <td>₹<%= Number(inv.total).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></td>
-            <td>₹<%= Number(inv.receivedAmount).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></td>
-            <td>₹<%= Number(inv.balance).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></td>
-            <td>
-              <% var cls = inv.paymentStatus === 'PAID' ? 'status-paid' : (inv.paymentStatus === 'PARTIALLY_PAID' ? 'status-partial' : 'status-unpaid'); %>
-              <span class="status-badge <%= cls %>"><%= inv.paymentStatus.replace('_',' ') %></span>
-            </td>
-            <td class="d-flex gap-1">
-              <a href="/invoices/<%= inv.id %>" class="btn btn-sm btn-outline-secondary">View</a>
-              <% if (inv.status !== 'CANCELLED') { %>
-                <a href="/invoices/<%= inv.id %>/edit" class="btn btn-sm btn-outline-primary">Edit</a>
-              <% } %>
-              <a href="/invoices/<%= inv.id %>/pdf" class="btn btn-sm btn-outline-secondary">PDF</a>
-            </td>
+            <th data-sort="date" style="width:118px">Date</th>
+            <th data-sort="text" style="width:130px">Number</th>
+            <th data-sort="text"><%= config.partyLabel %></th>
+            <% if (showSectionCol) { %><th data-sort="text" style="width:150px">Section</th><% } %>
+            <% if (showDepartmentCol) { %><th data-sort="text" style="width:150px">Department</th><% } %>
+            <th data-sort="num" class="num" style="width:130px">Amount</th>
+            <% if (settles) { %><th data-sort="num" class="num" style="width:130px">Balance</th><% } %>
+            <th style="width:120px">Status</th>
+            <th class="text-end" style="width:168px"><span class="visually-hidden">Actions</span></th>
           </tr>
-        <% }) %>
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          <% if (invoices.length === 0) { %>
+            <tr data-static><td colspan="<%= colCount %>">
+              <div class="empty-state">
+                <i class="icon-file-text"></i>
+                <% if (anyFilter) { %>
+                  <div class="title">No <%= config.pluralLabel.toLowerCase() %> match these filters</div>
+                  <a href="<%= config.basePath %>">Clear filters</a>
+                <% } else { %>
+                  <div class="title">No <%= config.pluralLabel.toLowerCase() %> yet</div>
+                  <% if (!config.returnOf) { %><a href="<%= config.basePath %>/new" class="btn btn-sm btn-primary"><i class="icon-plus"></i> <%= createLabel %></a><% } %>
+                <% } %>
+              </div>
+            </td></tr>
+          <% } %>
+          <% invoices.forEach(function(inv) { var cancelled = inv.status === 'CANCELLED'; %>
+            <tr class="<%= cancelled ? 'row-muted' : '' %>">
+              <td class="nowrap" data-sort-value="<%= new Date(inv.invoiceDate).toISOString() %>"><%= fdate(inv.invoiceDate) %></td>
+              <td>
+                <a href="<%= config.basePath %>/<%= inv.id %>" class="cell-main"><%= inv.invoiceNo %></a>
+                <% if (inv.partyInvoiceNo) { %><div class="cell-sub">Bill <%= inv.partyInvoiceNo %></div><% } %>
+              </td>
+              <td><div class="cell-truncate" title="<%= inv.customer.name %>"><%= inv.customer.name %></div></td>
+              <% var div = divs[invoices.indexOf(inv)]; %>
+              <% if (showSectionCol) { %>
+                <% if (div.unclassified) { %>
+                  <%# Not yet known to be a section or a department: shown as typed and marked %>
+                  <td data-sort-value="<%= div.unclassified %>"><span class="cell-truncate d-block" title="Saved under the old combined Section / Department label. Edit the invoice to classify it."><%= div.unclassified %></span><span class="badge text-bg-light border fw-normal">Unclassified</span></td>
+                <% } else { %>
+                  <td><% if (div.section) { %><a href="<%= config.basePath %>?section=<%= encodeURIComponent(div.section) %>" class="text-reset cell-truncate d-block" title="Show all <%= config.pluralLabel.toLowerCase() %> for section <%= div.section %>"><%= div.section %></a><% } else { %><span class="muted">—</span><% } %></td>
+                <% } %>
+              <% } %>
+              <% if (showDepartmentCol) { %>
+                <td><% if (div.department) { %><a href="<%= config.basePath %>?department=<%= encodeURIComponent(div.department) %>" class="text-reset cell-truncate d-block" title="Show all <%= config.pluralLabel.toLowerCase() %> for department <%= div.department %>"><%= div.department %></a><% } else { %><span class="muted">—</span><% } %></td>
+              <% } %>
+              <td class="num"><%= inr(inv.total) %></td>
+              <% if (settles) { %><td class="num <%= !cancelled && Number(inv.balance) > 0 ? 'text-danger' : 'muted' %>"><%= inr(inv.balance) %></td><% } %>
+              <td>
+                <% if (cancelled) { %>
+                  <span class="status-badge status-cancelled">Cancelled</span>
+                <% } else if (config.docType === 'ESTIMATE') { %>
+                  <% if (inv.convertedTo) { %><a href="/invoices/<%= inv.convertedTo.id %>" class="status-badge status-paid" title="Converted to <%= inv.convertedTo.invoiceNo %>">→ <%= inv.convertedTo.invoiceNo %></a><% } else { %><span class="status-badge status-open">Open</span><% } %>
+                <% } else { %>
+                  <span class="status-badge <%= paymentStatusClass(inv.paymentStatus) %>"><%= paymentStatusLabel(inv.paymentStatus) %></span>
+                <% } %>
+              </td>
+              <td>
+                <div class="row-actions">
+                  <% if (!cancelled) { %><a href="<%= config.basePath %>/<%= inv.id %>/edit" class="btn btn-sm btn-outline-secondary btn-icon" title="Edit <%= inv.invoiceNo %>" aria-label="Edit <%= inv.invoiceNo %>"><i class="icon-pencil"></i></a><% } %>
+                  <a href="<%= config.basePath %>/<%= inv.id %>/pdf" class="btn btn-sm btn-outline-secondary btn-icon" title="Download PDF" aria-label="Download PDF of <%= inv.invoiceNo %>"><i class="icon-download"></i></a>
+                  <a href="<%= config.basePath %>/<%= inv.id %>" class="btn btn-sm btn-outline-secondary">Open</a>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% if (invoiceCount > invoices.length) { %>
+      <div class="table-pager"><span>Showing the latest <%= invoices.length %> of <%= invoiceCount %>. Narrow the dates to see older ones.</span></div>
+    <% } %>
   </div>
 </div>
-
 <%- include('../partials/layout-end') %>

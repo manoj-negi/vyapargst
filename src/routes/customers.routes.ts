@@ -4,10 +4,9 @@ import { requireBusiness } from "../middleware/auth";
 
 export const customersRouter = Router();
 
-customersRouter.use(requireBusiness);
-
-customersRouter.get("/customers", customersController.listCustomers);
-customersRouter.get("/customers/new", customersController.showNewCustomer);
-customersRouter.post("/customers", customersController.createCustomer);
-customersRouter.get("/customers/:id/edit", customersController.showEditCustomer);
-customersRouter.post("/customers/:id", customersController.updateCustomer);
+customersRouter.get("/customers", requireBusiness, customersController.listCustomers);
+customersRouter.get("/customers/new", requireBusiness, customersController.showNewCustomer);
+customersRouter.post("/customers", requireBusiness, customersController.createCustomer);
+customersRouter.get("/customers/:id", requireBusiness, customersController.showStatement);
+customersRouter.get("/customers/:id/edit", requireBusiness, customersController.showEditCustomer);
+customersRouter.post("/customers/:id", requireBusiness, customersController.updateCustomer);

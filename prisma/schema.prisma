@@ -64,52 +64,96 @@ enum StockTransactionType {
   SALE
   PURCHASE
   ADJUSTMENT
+  SALE_RETURN
+  PURCHASE_RETURN
+  // Undoes the earlier movements of a document that was edited or cancelled
+  REVERSAL
+}
+
+// Every trade document lives in the SaleInvoice table; docType says which kind it is.
+enum DocType {
+  SALE_INVOICE
+  ESTIMATE
+  CREDIT_NOTE
+  PURCHASE_BILL
+  DEBIT_NOTE
+}
+
+enum PartyType {
+  CUSTOMER
+  SUPPLIER
+  BOTH
+}
+
+enum PaymentDirection {
+  IN
+  OUT
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
+  id           String     @id @default(uuid())
+  email        String     @unique
   passwordHash String
   name         String
-  createdAt    DateTime @default(now())
+  createdAt    DateTime   @default(now())
   businesses   Business[]
 }
 
 model Business {
-  id             String   @id @default(uuid())
-  ownerId        String
-  owner          User     @relation(fields: [ownerId], references: [id])
-  name           String
-  tradeName      String?
-  logoPath       String?
-  gstin          String?
-  pan            String?
-  businessType   String?
-  phone          String?
-  email          String?
-  address        String?
-  city           String?
-  state          String
-  pincode        String?
-  country        String   @default("India")
-  gstRegistered  Boolean  @default(true)
+  id                    String   @id @default(uuid())
+  ownerId               String
+  owner                 User     @relation(fields: [ownerId], references: [id])
+  name                  String
+  tradeName             String?
+  logoPath              String?
+  gstin                 String?
+  pan                   String?
+  businessType          String?
+  phone                 String?
+  email                 String?
+  address               String?
+  city                  String?
+  state                 String
+  pincode               String?
+  country               String   @default("India")
+  gstRegistered         Boolean  @default(true)
   // Printed in the "Bank Details" box on invoices
-  bankName          String?
-  bankAccountNo     String?
-  bankIfsc          String?
-  bankAccountHolder String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  bankName              String?
+  bankAccountNo         String?
+  bankIfsc              String?
+  bankAccountHolder     String?
+  upiId                 String?
+  upiName               String?
+  // Stamp & signature printed in the signatory box of sale documents (signaturePath is the image used:
+  // the transparent version or the original upload, per signatureUseClean)
+  signaturePath         String?
+  signatureOriginalPath String?
+  signatureCleanPath    String?
+  signatureUseClean     Boolean  @default(true)
+  signatureWidthMm      Int      @default(50)
+  signatureOnInvoices   Boolean  @default(false)
+  // The image already says "For <business>", so the printed heading is left out
+  signatureHidesHeading Boolean  @default(true)
+  // Printed at the bottom of invoices and estimates
+  invoiceTerms          String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  settings       BusinessSettings?
-  customers      Customer[]
-  categories     Category[]
-  units          Unit[]
-  products       Product[]
-  taxes          TaxMaster[]
-  hsnCodes       HSNMaster[]
-  invoices       SaleInvoice[]
-  invoiceSequences InvoiceSequence[]
+  settings          BusinessSettings?
+  customers         Customer[]
+  categories        Category[]
+  units             Unit[]
+  products          Product[]
+  taxes             TaxMaster[]
+  hsnCodes          HSNMaster[]
+  invoices          SaleInvoice[]
+  invoiceSequences  InvoiceSequence[]
+  paymentVouchers   PaymentVoucher[]
+  expenseCategories ExpenseCategory[]
+  expenses          Expense[]
+  auditLogs         AuditLog[]
+  purchaseImports   PurchaseImport[]
+  supplierItemMaps  SupplierItemMap[]
 }
 
 model BusinessSettings {
@@ -121,29 +165,43 @@ model BusinessSettings {
   financialYearFormat Boolean             @default(false)
   roundOffMode        RoundOffMode        @default(AUTOMATIC)
   negativeStockPolicy NegativeStockPolicy @default(ALLOW_WITH_WARNING)
+  estimatePrefix      String              @default("EST-")
+  creditNotePrefix    String              @default("CN-")
+  purchasePrefix      String              @default("PB-")
+  debitNotePrefix     String              @default("DN-")
+  paymentInPrefix     String              @default("PI-")
+  paymentOutPrefix    String              @default("PO-")
+  expensePrefix       String              @default("EXP-")
   updatedAt           DateTime            @updatedAt
 }
 
 model Customer {
-  id               String       @id @default(uuid())
-  businessId       String
-  business         Business     @relation(fields: [businessId], references: [id])
-  name             String
-  phone            String?
-  email            String?
-  gstin            String?
-  pan              String?
-  billingAddress   String?
-  shippingAddress  String?
-  state            String
-  pincode          String?
-  customerType     CustomerType @default(CONSUMER)
-  department       String?
-  section          String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  id                 String       @id @default(uuid())
+  businessId         String
+  business           Business     @relation(fields: [businessId], references: [id])
+  name               String
+  phone              String?
+  email              String?
+  gstin              String?
+  pan                String?
+  billingAddress     String?
+  shippingAddress    String?
+  state              String
+  pincode            String?
+  customerType       CustomerType @default(CONSUMER)
+  department         String?
+  section            String?
+  partyType          PartyType    @default(CUSTOMER)
+  // Positive = party owes the business (to receive), negative = business owes the party (to pay)
+  openingBalance     Decimal      @default(0) @db.Decimal(12, 2)
+  openingBalanceDate DateTime?
+  isActive           Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   invoices         SaleInvoice[]
+  paymentVouchers  PaymentVoucher[]
+  supplierItemMaps SupplierItemMap[]
 
   @@index([businessId, name])
 }
@@ -159,67 +217,69 @@ model Category {
 }
 
 model Unit {
-  id         String    @id @default(uuid())
-  businessId String
-  business   Business  @relation(fields: [businessId], references: [id])
-  name       String
-  shortName  String
-  products   Product[] @relation("ProductBaseUnit")
+  id                String    @id @default(uuid())
+  businessId        String
+  business          Business  @relation(fields: [businessId], references: [id])
+  name              String
+  shortName         String
+  products          Product[] @relation("ProductBaseUnit")
   secondaryProducts Product[] @relation("ProductSecondaryUnit")
 
   @@unique([businessId, name])
 }
 
 model Product {
-  id               String        @id @default(uuid())
-  businessId       String
-  business         Business      @relation(fields: [businessId], references: [id])
-  name             String
-  itemCode         String?
-  barcode          String?
-  isService        Boolean       @default(false)
-  imagePath        String?
+  id         String   @id @default(uuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+  name       String
+  itemCode   String?
+  barcode    String?
+  isService  Boolean  @default(false)
+  imagePath  String?
 
-  hsnCode          String?
-  categoryId       String?
-  category         Category?     @relation(fields: [categoryId], references: [id])
-  unitId           String?
-  unit             Unit?         @relation("ProductBaseUnit", fields: [unitId], references: [id])
+  hsnCode         String?
+  categoryId      String?
+  category        Category? @relation(fields: [categoryId], references: [id])
+  unitId          String?
+  unit            Unit?     @relation("ProductBaseUnit", fields: [unitId], references: [id])
   // Optional secondary unit: 1 base unit = conversionRate secondary units (e.g. 1 BOX = 12 PIECES)
-  secondaryUnitId  String?
-  secondaryUnit    Unit?         @relation("ProductSecondaryUnit", fields: [secondaryUnitId], references: [id])
-  conversionRate   Decimal?      @db.Decimal(12, 4)
+  secondaryUnitId String?
+  secondaryUnit   Unit?     @relation("ProductSecondaryUnit", fields: [secondaryUnitId], references: [id])
+  conversionRate  Decimal?  @db.Decimal(12, 4)
 
-  salePrice        Decimal       @db.Decimal(12, 2)
+  salePrice         Decimal   @db.Decimal(12, 2)
   // Tax treatment of salePrice (With Tax / Without Tax)
-  priceType        PriceType     @default(EXCLUSIVE)
-  purchasePrice    Decimal?      @db.Decimal(12, 2)
-  purchasePriceType PriceType    @default(EXCLUSIVE)
+  priceType         PriceType @default(EXCLUSIVE)
+  purchasePrice     Decimal?  @db.Decimal(12, 2)
+  purchasePriceType PriceType @default(EXCLUSIVE)
 
-  wholesalePrice     Decimal?    @db.Decimal(12, 2)
-  wholesalePriceType PriceType   @default(EXCLUSIVE)
-  minWholesaleQty    Decimal?    @db.Decimal(12, 2)
+  wholesalePrice     Decimal?  @db.Decimal(12, 2)
+  wholesalePriceType PriceType @default(EXCLUSIVE)
+  minWholesaleQty    Decimal?  @db.Decimal(12, 2)
 
-  taxId            String?
-  tax              TaxMaster?    @relation(fields: [taxId], references: [id])
+  taxId String?
+  tax   TaxMaster? @relation(fields: [taxId], references: [id])
 
-  defaultDiscount     Decimal?    @db.Decimal(12, 2)
+  defaultDiscount     Decimal?     @db.Decimal(12, 2)
   defaultDiscountType DiscountType @default(PERCENTAGE)
 
-  openingStock     Decimal       @default(0) @db.Decimal(12, 2)
+  openingStock      Decimal   @default(0) @db.Decimal(12, 2)
   // Per-unit value of the opening stock and the date it was counted
-  openingStockPrice Decimal?     @db.Decimal(12, 2)
-  openingStockDate DateTime?
-  stockLocation    String?
-  minStock         Decimal       @default(0) @db.Decimal(12, 2)
-  currentStock     Decimal       @default(0) @db.Decimal(12, 2)
+  openingStockPrice Decimal?  @db.Decimal(12, 2)
+  openingStockDate  DateTime?
+  stockLocation     String?
+  minStock          Decimal   @default(0) @db.Decimal(12, 2)
+  currentStock      Decimal   @default(0) @db.Decimal(12, 2)
 
-  isActive         Boolean       @default(true)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  invoiceItems     SaleInvoiceItem[]
+  invoiceItems      SaleInvoiceItem[]
   stockTransactions StockTransaction[]
+  supplierItemMaps  SupplierItemMap[]
+  priceHistory      ProductPriceHistory[]
 
   @@index([businessId, name])
   @@index([businessId, itemCode])
@@ -227,19 +287,19 @@ model Product {
 }
 
 model HSNMaster {
-  id             String    @id @default(uuid())
-  businessId     String?
-  business       Business? @relation(fields: [businessId], references: [id])
-  hsnCode        String
-  description    String
-  chapter        String?
-  heading        String?
-  subHeading     String?
-  keywords       String?
-  gstRate        Decimal   @db.Decimal(5, 2)
-  effectiveFrom  DateTime?
-  effectiveTo    DateTime?
-  isActive       Boolean   @default(true)
+  id            String    @id @default(uuid())
+  businessId    String?
+  business      Business? @relation(fields: [businessId], references: [id])
+  hsnCode       String
+  description   String
+  chapter       String?
+  heading       String?
+  subHeading    String?
+  keywords      String?
+  gstRate       Decimal   @db.Decimal(5, 2)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
 
   @@index([hsnCode])
   @@index([description])
@@ -261,112 +321,342 @@ model TaxMaster {
   effectiveFrom DateTime?
   effectiveTo   DateTime?
 
-  products      Product[]
+  products Product[]
 
   @@unique([businessId, rate])
 }
 
 model InvoiceSequence {
-  id             String   @id @default(uuid())
-  businessId     String
-  business       Business @relation(fields: [businessId], references: [id])
-  prefix         String
+  id            String   @id @default(uuid())
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id])
+  prefix        String
   // Empty string (not null) when financial-year numbering is off, so the composite unique
   // constraint below reliably finds the same row across calls (Postgres treats NULL as
   // distinct from itself in unique constraints, which would otherwise create duplicate rows).
-  financialYear  String   @default("")
-  lastNumber     Int      @default(0)
+  financialYear String   @default("")
+  lastNumber    Int      @default(0)
 
   @@unique([businessId, prefix, financialYear])
 }
 
 model SaleInvoice {
-  id              String        @id @default(uuid())
-  businessId      String
-  business        Business      @relation(fields: [businessId], references: [id])
-  customerId      String
-  customer        Customer      @relation(fields: [customerId], references: [id])
+  id         String   @id @default(uuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
 
-  invoiceNo       String
-  invoiceDate     DateTime      @default(now())
-  dueDate         DateTime?
-  placeOfSupply   String
-  taxType         TaxType
+  docType       DocType   @default(SALE_INVOICE)
+  invoiceNo     String
+  invoiceDate   DateTime  @default(now())
+  dueDate       DateTime?
+  placeOfSupply String
+  taxType       TaxType
 
-  subtotal        Decimal       @db.Decimal(12, 2)
-  discount        Decimal       @default(0) @db.Decimal(12, 2)
-  taxableAmount   Decimal       @db.Decimal(12, 2)
-  cgst            Decimal       @default(0) @db.Decimal(12, 2)
-  sgst            Decimal       @default(0) @db.Decimal(12, 2)
-  igst            Decimal       @default(0) @db.Decimal(12, 2)
-  cess            Decimal       @default(0) @db.Decimal(12, 2)
-  roundOff        Decimal       @default(0) @db.Decimal(12, 2)
-  total           Decimal       @db.Decimal(12, 2)
+  subtotal      Decimal @db.Decimal(12, 2)
+  discount      Decimal @default(0) @db.Decimal(12, 2)
+  taxableAmount Decimal @db.Decimal(12, 2)
+  cgst          Decimal @default(0) @db.Decimal(12, 2)
+  sgst          Decimal @default(0) @db.Decimal(12, 2)
+  igst          Decimal @default(0) @db.Decimal(12, 2)
+  cess          Decimal @default(0) @db.Decimal(12, 2)
+  roundOff      Decimal @default(0) @db.Decimal(12, 2)
+  total         Decimal @db.Decimal(12, 2)
 
-  receivedAmount  Decimal       @default(0) @db.Decimal(12, 2)
-  balance         Decimal       @default(0) @db.Decimal(12, 2)
-  paymentStatus   PaymentStatus @default(UNPAID)
-  status          InvoiceStatus @default(ACTIVE)
+  receivedAmount Decimal       @default(0) @db.Decimal(12, 2)
+  balance        Decimal       @default(0) @db.Decimal(12, 2)
+  paymentStatus  PaymentStatus @default(UNPAID)
+  status         InvoiceStatus @default(ACTIVE)
 
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  // Invoice-level discount as entered (discount above holds the resulting amount)
+  invoiceDiscountValue    Decimal?      @db.Decimal(12, 2)
+  invoiceDiscountType     DiscountType?
+  // Delivery / other charges, taxed at chargesTaxRate and included in taxableAmount and the tax columns
+  chargesLabel            String?
+  chargesAmount           Decimal       @default(0) @db.Decimal(12, 2)
+  chargesTaxRate          Decimal       @default(0) @db.Decimal(5, 2)
+  // Section and department of the customer this document is for (sale side). Stored per document,
+  // so one customer record can be billed for several sections / departments.
+  section                 String?
+  department              String?
+  // true while "department" still holds an older value saved under the combined label
+  // "Section / Department" that has not been classified as a section or a department yet
+  legacySectionDepartment Boolean       @default(false)
+  // Supplier's own bill number/date on purchase bills and debit notes
+  partyInvoiceNo          String?
+  partyInvoiceDate        DateTime?
+  // Estimate this invoice was created from (unique: an estimate converts at most once)
+  convertedFromId         String?       @unique
+  convertedFrom           SaleInvoice?  @relation("Conversion", fields: [convertedFromId], references: [id])
+  convertedTo             SaleInvoice?  @relation("Conversion")
+  // Invoice/bill a credit or debit note returns against
+  originalDocId           String?
+  originalDoc             SaleInvoice?  @relation("Returns", fields: [originalDocId], references: [id])
+  returns                 SaleInvoice[] @relation("Returns")
+  // Part of a credit/debit note's total set off against originalDoc's balance
+  adjustedAmount          Decimal       @default(0) @db.Decimal(12, 2)
+  notes                   String?
+  terms                   String?
+  // Business and party details as printed when the document was issued (null on older invoices)
+  businessSnapshot        Json?
+  partySnapshot           Json?
+  // Form submission token; a repeated submit finds the existing document instead of creating another
+  clientToken             String?       @unique
+  cancelledAt             DateTime?
+  cancelReason            String?
 
-  items           SaleInvoiceItem[]
-  payments        Payment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items             SaleInvoiceItem[]
+  payments          Payment[]
+  allocations       PaymentAllocation[]
   stockTransactions StockTransaction[]
+  importedFrom      PurchaseImport?
 
-  @@unique([businessId, invoiceNo])
+  @@unique([businessId, docType, invoiceNo])
+  @@index([businessId, docType, invoiceDate])
+  @@index([businessId, customerId, department])
+  @@index([businessId, customerId, section])
   @@index([businessId, invoiceDate])
   @@index([businessId, paymentStatus])
 }
 
 model SaleInvoiceItem {
-  id             String      @id @default(uuid())
-  invoiceId      String
-  invoice        SaleInvoice @relation(fields: [invoiceId], references: [id])
-  productId      String?
-  product        Product?    @relation(fields: [productId], references: [id])
+  id        String      @id @default(uuid())
+  invoiceId String
+  invoice   SaleInvoice @relation(fields: [invoiceId], references: [id])
+  productId String?
+  product   Product?    @relation(fields: [productId], references: [id])
 
   // Snapshot fields — frozen at time of sale, never recomputed from live Product later
-  productName    String
-  hsn            String?
-  unit           String?
-  quantity       Decimal     @db.Decimal(12, 2)
-  rate           Decimal     @db.Decimal(12, 2)
-  discount       Decimal     @default(0) @db.Decimal(12, 2)
-  discountType   DiscountType @default(PERCENTAGE)
-  taxRate        Decimal     @db.Decimal(5, 2)
-  taxableAmount  Decimal     @db.Decimal(12, 2)
-  cgst           Decimal     @default(0) @db.Decimal(12, 2)
-  sgst           Decimal     @default(0) @db.Decimal(12, 2)
-  igst           Decimal     @default(0) @db.Decimal(12, 2)
-  finalAmount    Decimal     @db.Decimal(12, 2)
+  productName   String
+  hsn           String?
+  unit          String?
+  quantity      Decimal      @db.Decimal(12, 2)
+  rate          Decimal      @db.Decimal(12, 2)
+  discount      Decimal      @default(0) @db.Decimal(12, 2)
+  discountType  DiscountType @default(PERCENTAGE)
+  taxRate       Decimal      @db.Decimal(5, 2)
+  // With/without tax treatment of rate at the time of sale (null on older invoices)
+  priceType     PriceType?
+  taxableAmount Decimal      @db.Decimal(12, 2)
+  cgst          Decimal      @default(0) @db.Decimal(12, 2)
+  sgst          Decimal      @default(0) @db.Decimal(12, 2)
+  igst          Decimal      @default(0) @db.Decimal(12, 2)
+  finalAmount   Decimal      @db.Decimal(12, 2)
+  // Cost of one unit of this line (in the line's unit, excluding recoverable purchase GST) when it was
+  // saved; costBasis says where it came from ("purchase-price", or "missing" with unitCost NULL).
+  // Both NULL on lines saved before costs were recorded.
+  unitCost      Decimal?     @db.Decimal(12, 4)
+  costBasis     String?
 
   @@index([invoiceId])
+  @@index([productId])
 }
 
+// Legacy per-invoice payments. Superseded by PaymentVoucher/PaymentAllocation; rows are copied there by migration.
 model Payment {
-  id         String      @id @default(uuid())
-  invoiceId  String
-  invoice    SaleInvoice @relation(fields: [invoiceId], references: [id])
-  amount     Decimal     @db.Decimal(12, 2)
-  type       PaymentType @default(CASH)
-  date       DateTime    @default(now())
+  id        String      @id @default(uuid())
+  invoiceId String
+  invoice   SaleInvoice @relation(fields: [invoiceId], references: [id])
+  amount    Decimal     @db.Decimal(12, 2)
+  type      PaymentType @default(CASH)
+  date      DateTime    @default(now())
 
   @@index([invoiceId])
 }
 
 model StockTransaction {
-  id                String              @id @default(uuid())
-  productId         String
-  product           Product             @relation(fields: [productId], references: [id])
-  type              StockTransactionType
-  quantity          Decimal             @db.Decimal(12, 2)
-  resultingStock    Decimal             @db.Decimal(12, 2)
+  id                 String               @id @default(uuid())
+  productId          String
+  product            Product              @relation(fields: [productId], references: [id])
+  type               StockTransactionType
+  quantity           Decimal              @db.Decimal(12, 2)
+  resultingStock     Decimal              @db.Decimal(12, 2)
   referenceInvoiceId String?
-  referenceInvoice  SaleInvoice?        @relation(fields: [referenceInvoiceId], references: [id])
-  note              String?
-  date              DateTime            @default(now())
+  referenceInvoice   SaleInvoice?         @relation(fields: [referenceInvoiceId], references: [id])
+  note               String?
+  date               DateTime             @default(now())
 
   @@index([productId, date])
+}
+
+model PaymentVoucher {
+  id           String           @id @default(uuid())
+  businessId   String
+  business     Business         @relation(fields: [businessId], references: [id])
+  partyId      String?
+  party        Customer?        @relation(fields: [partyId], references: [id])
+  direction    PaymentDirection
+  voucherNo    String
+  date         DateTime         @default(now())
+  amount       Decimal          @db.Decimal(12, 2)
+  mode         PaymentType      @default(CASH)
+  reference    String?
+  note         String?
+  status       InvoiceStatus    @default(ACTIVE)
+  cancelledAt  DateTime?
+  cancelReason String?
+  clientToken  String?          @unique
+  createdAt    DateTime         @default(now())
+
+  allocations PaymentAllocation[]
+
+  @@unique([businessId, direction, voucherNo])
+  @@index([businessId, date])
+  @@index([partyId])
+}
+
+model PaymentAllocation {
+  id         String         @id @default(uuid())
+  voucherId  String
+  voucher    PaymentVoucher @relation(fields: [voucherId], references: [id])
+  documentId String
+  document   SaleInvoice    @relation(fields: [documentId], references: [id])
+  amount     Decimal        @db.Decimal(12, 2)
+
+  @@index([documentId])
+  @@index([voucherId])
+}
+
+model ExpenseCategory {
+  id         String    @id @default(uuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id])
+  name       String
+  expenses   Expense[]
+
+  @@unique([businessId, name])
+}
+
+model Expense {
+  id           String          @id @default(uuid())
+  businessId   String
+  business     Business        @relation(fields: [businessId], references: [id])
+  expenseNo    String
+  date         DateTime        @default(now())
+  categoryId   String
+  category     ExpenseCategory @relation(fields: [categoryId], references: [id])
+  amount       Decimal         @db.Decimal(12, 2)
+  mode         PaymentType     @default(CASH)
+  paidTo       String?
+  note         String?
+  status       InvoiceStatus   @default(ACTIVE)
+  cancelledAt  DateTime?
+  cancelReason String?
+  clientToken  String?         @unique
+  createdAt    DateTime        @default(now())
+
+  @@unique([businessId, expenseNo])
+  @@index([businessId, date])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+  userId     String?
+  entity     String
+  entityId   String
+  action     String
+  detail     Json?
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, entity, entityId])
+}
+
+// ---------- AI purchase-bill import ----------
+// A supplier document being turned into a purchase bill. Scanning and saving the draft change nothing
+// else; stock, prices and balances change only when the import is confirmed (status POSTED).
+model PurchaseImport {
+  id           String               @id @default(uuid())
+  businessId   String
+  business     Business             @relation(fields: [businessId], references: [id])
+  // UPLOADED, EXTRACTING, NEEDS_SETUP, FAILED, DRAFT, POSTING, POSTED, DISCARDED
+  status       String               @default("UPLOADED")
+  // INVOICE, CATALOG, QUOTATION, PRICE_LIST, OTHER (CATALOG/QUOTATION/PRICE_LIST create products only)
+  documentKind String?
+  // How the content was read: e.g. "spreadsheet", "claude:claude-opus-5-5"
+  extractor    String?
+  // What the files contained (sheets, tables, text) and what was extracted, before the user's edits
+  sourceData   Json?
+  extracted    Json?
+  // The editable review state (header, rows, choices); validated on every save
+  draft        Json?
+  error        String?
+  purchaseId   String?              @unique
+  purchase     SaleInvoice?         @relation(fields: [purchaseId], references: [id])
+  createdById  String?
+  postedAt     DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  files        PurchaseImportFile[]
+
+  @@index([businessId, status, createdAt])
+}
+
+// An uploaded supplier document (stored under public/uploads/purchase-docs, which is never served
+// publicly; included in backups with the rest of public/uploads)
+model PurchaseImportFile {
+  id           String         @id @default(uuid())
+  importId     String
+  import       PurchaseImport @relation(fields: [importId], references: [id])
+  storedName   String
+  originalName String
+  detectedType String
+  mimeType     String
+  size         Int
+  sha256       String
+  pageCount    Int?
+  rotation     Int            @default(0)
+  position     Int            @default(0)
+  createdAt    DateTime       @default(now())
+
+  @@index([sha256])
+  @@index([importId])
+}
+
+// A supplier's item (by its code, or its normalised description) confirmed as one of our products,
+// so later bills from the same supplier match it directly. unitFactor: base units per bill unit.
+model SupplierItemMap {
+  id           String   @id @default(uuid())
+  businessId   String
+  business     Business @relation(fields: [businessId], references: [id])
+  supplierId   String
+  supplier     Customer @relation(fields: [supplierId], references: [id])
+  matchKey     String
+  supplierCode String?
+  description  String
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id])
+  billUnit     String?
+  unitFactor   Decimal  @default(1) @db.Decimal(12, 4)
+  lastImportId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([businessId, supplierId, matchKey])
+  @@index([productId])
+}
+
+// Changes to an item's default purchase price (the actual bill rate is always on the purchase itself)
+model ProductPriceHistory {
+  id             String     @id @default(uuid())
+  businessId     String
+  productId      String
+  product        Product    @relation(fields: [productId], references: [id])
+  field          String     @default("purchasePrice")
+  oldValue       Decimal?   @db.Decimal(12, 2)
+  oldPriceType   PriceType?
+  newValue       Decimal    @db.Decimal(12, 2)
+  newPriceType   PriceType
+  sourceDocId    String?
+  sourceImportId String?
+  note           String?
+  userId         String?
+  createdAt      DateTime   @default(now())
+
+  @@index([productId, createdAt])
 }

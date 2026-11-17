@@ -1,0 +1,66 @@
+<%- include('../partials/layout-start', { title: title, activeNav: activeNav }) %>
+<% var anyFilter = filters.from || filters.to || filters.partyId || filters.status; %>
+<div class="page" data-list-key="/payments">
+  <%- include('../partials/page-header', {
+    title: title,
+    subtitle: 'Each payment is counted once here and in the Cash & Bank book; sales and purchases are counted on their invoices.',
+    actions: '<a href="/payments/new?direction=OUT" class="btn btn-outline-secondary"><i class="icon-banknote"></i> Payment out</a><a href="/payments/new?direction=IN" class="btn btn-primary"><i class="icon-hand-coins"></i> Payment in</a>'
+  }) %>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Received (in list)</div><div class="kpi-value text-success"><%= inr(totals.in) %></div></div>
+    <div class="kpi"><div class="kpi-label">Paid (in list)</div><div class="kpi-value text-danger"><%= inr(totals.out) %></div></div>
+  </div>
+
+  <div class="panel">
+    <form method="GET" action="/payments" class="filter-bar" role="search">
+      <div class="chips align-self-end me-2">
+        <a class="chip <%= !filters.direction ? 'active' : '' %>" href="/payments">All</a>
+        <a class="chip <%= filters.direction === 'IN' ? 'active' : '' %>" href="/payments?direction=IN">In</a>
+        <a class="chip <%= filters.direction === 'OUT' ? 'active' : '' %>" href="/payments?direction=OUT">Out</a>
+      </div>
+      <input type="hidden" name="direction" value="<%= filters.direction %>">
+      <div class="f f-select-lg"><label class="form-label" for="pp">Party</label>
+        <select id="pp" name="partyId" class="form-select form-select-sm"><option value="">All</option>
+          <% parties.forEach(function(p) { %><option value="<%= p.id %>" <%= filters.partyId === p.id ? 'selected' : '' %>><%= p.name %></option><% }) %>
+        </select></div>
+      <div class="f f-date"><label class="form-label" for="pf">From</label><input type="date" id="pf" name="from" class="form-control form-control-sm" value="<%= filters.from %>"></div>
+      <div class="f f-date"><label class="form-label" for="pt">To</label><input type="date" id="pt" name="to" class="form-control form-control-sm" value="<%= filters.to %>"></div>
+      <div class="f f-select"><label class="form-label" for="ps">Show</label>
+        <select id="ps" name="status" class="form-select form-select-sm">
+          <option value="">Active</option>
+          <option value="CANCELLED" <%= filters.status === 'CANCELLED' ? 'selected' : '' %>>Cancelled</option>
+          <option value="ALL" <%= filters.status === 'ALL' ? 'selected' : '' %>>All</option>
+        </select></div>
+      <div class="f-actions">
+        <% if (anyFilter) { %><a href="/payments<%= filters.direction ? '?direction=' + filters.direction : '' %>" class="btn btn-sm btn-outline-secondary">Clear</a><% } %>
+        <button class="btn btn-sm btn-primary"><i class="icon-filter"></i> Apply</button>
+      </div>
+    </form>
+    <div class="table-scroll sticky">
+      <table class="table table-app" data-sortable data-page-size="50">
+        <thead><tr>
+          <th data-sort="date" style="width:110px">Date</th><th data-sort="text" style="width:130px">Number</th><th style="width:70px">Type</th>
+          <th data-sort="text">Party</th><th style="width:90px">Mode</th><th>Settled against</th>
+          <th data-sort="num" class="num" style="width:130px">Amount</th><th style="width:70px"></th>
+        </tr></thead>
+        <tbody>
+          <% if (vouchers.length === 0) { %><tr data-static><td colspan="8"><div class="empty-state"><i class="icon-wallet"></i><div class="title">No payments found</div><% if (anyFilter) { %><a href="/payments">Clear filters</a><% } %></div></td></tr><% } %>
+          <% vouchers.forEach(function(v) { var cancelled = v.status === 'CANCELLED'; %>
+            <tr class="<%= cancelled ? 'row-muted' : '' %>">
+              <td class="nowrap" data-sort-value="<%= new Date(v.date).toISOString() %>"><%= fdate(v.date) %></td>
+              <td><a href="/payments/<%= v.id %>" class="cell-main"><%= v.voucherNo %></a><% if (cancelled) { %><div class="cell-sub">Cancelled</div><% } %></td>
+              <td><span class="status-badge <%= v.direction === 'IN' ? 'status-paid' : 'status-unpaid' %>"><%= v.direction === 'IN' ? 'In' : 'Out' %></span></td>
+              <td><div class="cell-truncate" title="<%= v.party ? v.party.name : '' %>"><%= v.party ? v.party.name : '—' %></div></td>
+              <td><%= modeLabel(v.mode) %></td>
+              <td><div class="cell-truncate small" title="<%= v.allocations.map(function(a) { return a.document.invoiceNo; }).join(', ') %>"><%= v.allocations.map(function(a) { return a.document.invoiceNo; }).join(', ') || 'Advance' %></div></td>
+              <td class="num fw-semibold <%= cancelled ? '' : (v.direction === 'IN' ? 'text-success' : 'text-danger') %>"><%= inr(v.amount) %></td>
+              <td class="text-end"><a href="/payments/<%= v.id %>" class="btn btn-sm btn-outline-secondary">Open</a></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<%- include('../partials/layout-end') %>

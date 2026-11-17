@@ -1,0 +1,64 @@
+<%- include('../partials/layout-start', { title: 'Import purchase bill', activeNav: 'purchases' }) %>
+<%
+  var statusLabel = { UPLOADED: ['Uploaded', 'status-open'], EXTRACTING: ['Reading…', 'status-open'], NEEDS_SETUP: ['AI setup required', 'status-partial'], FAILED: ['Could not read', 'status-unpaid'], DRAFT: ['Draft', 'status-open'], POSTING: ['Saving…', 'status-open'], POSTED: ['Saved', 'status-paid'] };
+  var accept = '.pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.tif,.tiff,.xlsx,.xls,.csv,.tsv,.ods,.docx,.doc,.odt,.rtf,.txt,.pptx,.ppt,application/pdf,image/*';
+%>
+<div class="page page-medium">
+  <%- include('../partials/page-header', {
+    title: 'Import purchase bill',
+    subtitle: 'Upload the supplier’s bill. The app prepares the purchase for you to check; nothing changes in stock, prices or balances until you confirm.',
+    back: { href: '/purchases', label: 'Purchase Bills', key: '/purchases' }
+  }) %>
+
+  <%- include('_services', { services: services }) %>
+
+  <section class="panel import-upload" data-import-upload>
+    <div class="panel-body">
+      <div class="dropzone" data-dropzone tabindex="0" role="button" aria-label="Choose bill files or drop them here">
+        <i class="icon-file-up" aria-hidden="true"></i>
+        <div class="dz-title">Drop the bill here, or choose files</div>
+        <div class="dz-sub">Several pages or files of one bill can go together.</div>
+        <div class="dz-actions">
+          <button type="button" class="btn btn-primary" data-pick><i class="icon-folder-open"></i> Choose files</button>
+          <button type="button" class="btn btn-outline-primary" data-camera><i class="icon-camera"></i> Take photo</button>
+        </div>
+        <input type="file" multiple accept="<%= accept %>" data-files hidden>
+        <input type="file" accept="image/*" capture="environment" data-camera-input hidden>
+      </div>
+      <ul class="import-files" data-file-list></ul>
+      <fieldset class="import-grouping" data-grouping hidden>
+        <legend class="form-label">These files are</legend>
+        <label class="form-check"><input class="form-check-input" type="radio" name="grouping" value="one" checked> <span class="form-check-label">Pages of <strong>one</strong> bill</span></label>
+        <label class="form-check"><input class="form-check-input" type="radio" name="grouping" value="separate"> <span class="form-check-label"><strong>Separate</strong> bills (one import each)</span></label>
+      </fieldset>
+      <div class="alert alert-danger d-none" data-upload-error role="alert"></div>
+      <div class="import-progress" data-progress hidden><div class="progress"><div class="progress-bar" style="width:0%"></div></div><span class="small text-muted" data-progress-text>Uploading…</span></div>
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
+        <div class="small text-muted">Supported: <%= supported %>.<br>Up to <%= limits.files %> files, <%= limits.fileBytes / 1024 / 1024 %> MB each, <%= limits.pdfPages %> pages per PDF.<% if (!libreOffice) { %> Older .doc/.ppt files need LibreOffice on the server (not installed): save them as DOCX/PPTX/PDF.<% } %></div>
+        <button type="button" class="btn btn-primary" data-upload disabled><i class="icon-scan-line"></i> Upload &amp; read</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel mt-3">
+    <div class="panel-header"><h2 class="panel-title">Recent imports</h2><a href="/purchases/new" class="btn btn-sm btn-tertiary">Enter a purchase by hand</a></div>
+    <div class="table-scroll">
+      <table class="table table-app">
+        <thead><tr><th style="width:140px">Uploaded</th><th>Files</th><th style="width:170px">Status</th><th class="text-end" style="width:120px"><span class="visually-hidden">Open</span></th></tr></thead>
+        <tbody>
+          <% if (!imports.length) { %><tr data-static><td colspan="4"><div class="empty-state"><i class="icon-file-text"></i>No imports yet.</div></td></tr><% } %>
+          <% imports.forEach(function (imp) { var st = statusLabel[imp.status] || [imp.status, 'status-open']; %>
+          <tr>
+            <td class="nowrap"><%= fdate(imp.createdAt) %></td>
+            <td><div class="cell-truncate" title="<%= imp.files.map(function (f) { return f.originalName; }).join(', ') %>"><%= imp.files.map(function (f) { return f.originalName; }).join(', ') %></div></td>
+            <td><span class="status-badge <%= st[1] %>"><%= st[0] %></span><% if (imp.purchase) { %> <a href="/purchases/<%= imp.purchase.id %>" class="small"><%= imp.purchase.invoiceNo %></a><% } %></td>
+            <td class="text-end"><a href="/purchases/import/<%= imp.id %>" class="btn btn-sm btn-outline-secondary"><%= imp.status === 'POSTED' ? 'View' : 'Open' %></a></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+<script src="/js/purchase-import-upload.js"></script>
+<%- include('../partials/layout-end') %>

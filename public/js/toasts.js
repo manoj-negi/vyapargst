@@ -6,19 +6,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  const sidebarToggle = document.getElementById("sidebarToggle");
-  if (sidebarToggle) {
-    sidebarToggle.addEventListener("click", () => {
-      document.querySelector(".app-shell").classList.toggle("sidebar-collapsed");
-    });
-  }
-
-  const mobileMenuToggle = document.getElementById("mobileMenuToggle");
-  if (mobileMenuToggle) {
-    mobileMenuToggle.addEventListener("click", () => {
-      document.querySelector(".app-shell").classList.toggle("mobile-open");
-    });
-  }
 });
 
 function showToast(message, type = "success") {

@@ -1,0 +1,69 @@
+<%- include('../partials/layout-start', { title: title, activeNav: activeNav }) %>
+<%
+  var qs = 'from=' + encodeURIComponent(filters.from) + '&to=' + encodeURIComponent(filters.to) + '&productId=' + encodeURIComponent(filters.productId);
+  var numeric = report.columns.map(function(c) { return /₹|Qty|Stock|Rate|Value/i.test(c); });
+  var moneyCol = report.columns.map(function(c) { return /₹/.test(c); });
+  // Structured reports keep their row order (sections, then totals)
+  var sortable = reportKey !== 'gst-summary';
+  function cellText(cell, i) {
+    if (cell === null || cell === undefined || cell === '') return '';
+    if (moneyCol[i] && /^-?\d+(\.\d+)?$/.test(String(cell))) return Number(cell).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return cell;
+  }
+  var exportMenu = '<div class="dropdown"><button class="btn btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false"><i class="icon-download"></i> Export</button><ul class="dropdown-menu dropdown-menu-end">' +
+    '<li><a class="dropdown-item" href="/reports/' + reportKey + '?' + qs + '&format=pdf"><i class="icon-file-text"></i> PDF</a></li>' +
+    '<li><a class="dropdown-item" href="/reports/' + reportKey + '?' + qs + '&format=csv"><i class="icon-sheet"></i> CSV (Excel)</a></li></ul></div>';
+  var now = new Date();
+  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  var fyStartYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  function iso(d) { return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+  var presets = [
+    ['This month', iso(monthStart), iso(now)],
+    ['Last month', iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)), iso(new Date(now.getFullYear(), now.getMonth(), 0))],
+    ['This FY', fyStartYear + '-04-01', iso(now)],
+  ];
+%>
+<div class="page" data-list-key="/reports/<%= reportKey %>">
+  <%- include('../partials/page-header', { title: report.title, subtitle: period, back: { href: '/reports', label: 'Reports' }, actions: exportMenu }) %>
+  <div class="panel">
+    <% if (report.dated || products.length) { %>
+    <form method="GET" class="filter-bar">
+      <% if (report.dated) { %>
+        <div class="f f-date"><label class="form-label" for="rf">From</label><input type="date" id="rf" name="from" class="form-control form-control-sm" value="<%= filters.from %>"></div>
+        <div class="f f-date"><label class="form-label" for="rt">To</label><input type="date" id="rt" name="to" class="form-control form-control-sm" value="<%= filters.to %>"></div>
+      <% } %>
+      <% if (products.length) { %>
+        <div class="f f-select-lg"><label class="form-label" for="rp">Item</label>
+          <select id="rp" name="productId" class="form-select form-select-sm"><option value="">All items</option>
+            <% products.forEach(function(p) { %><option value="<%= p.id %>" <%= filters.productId === p.id ? 'selected' : '' %>><%= p.name %></option><% }) %>
+          </select></div>
+      <% } %>
+      <div class="f-actions" style="margin-left:0"><button class="btn btn-sm btn-primary">Apply</button></div>
+      <% if (report.dated) { %>
+        <div class="chips align-self-end ms-auto">
+          <% presets.forEach(function(p) { var active = filters.from === p[1] && filters.to === p[2]; %>
+            <a class="chip <%= active ? 'active' : '' %>" href="/reports/<%= reportKey %>?from=<%= p[1] %>&to=<%= p[2] %><%= filters.productId ? '&productId=' + filters.productId : '' %>"><%= p[0] %></a>
+          <% }) %>
+          <% if (filters.from || filters.to) { %><a class="chip" href="/reports/<%= reportKey %>">All dates</a><% } %>
+        </div>
+      <% } %>
+    </form>
+    <% } %>
+    <div class="table-scroll sticky">
+      <table class="table table-app" <%- sortable ? 'data-sortable data-page-size="100"' : '' %>>
+        <thead><tr><% report.columns.forEach(function(c, i) { %><th class="<%= numeric[i] ? 'num' : '' %>" <%- sortable ? 'data-sort="' + (numeric[i] ? 'num' : 'text') + '"' : '' %>><%= c %></th><% }) %></tr></thead>
+        <tbody>
+          <% if (report.rows.length === 0) { %><tr data-static><td colspan="<%= report.columns.length %>"><div class="empty-state"><i class="icon-chart-column"></i><div class="title">No records for this period</div></div></td></tr><% } %>
+          <% report.rows.forEach(function(r) { var heading = r.slice(1).every(function(c) { return c === '' || c === null; }); %><tr class="<%= heading ? 'table-light fw-semibold' : (/^Total/.test(String(r[0])) ? 'fw-semibold' : '') %>"><% r.forEach(function(cell, i) { %><td class="<%= numeric[i] ? 'num' : '' %>"><%= cellText(cell, i) %></td><% }) %></tr><% }) %>
+        </tbody>
+        <% if ((report.footer || []).length) { %>
+        <tfoot>
+          <% report.footer.forEach(function(r) { %><tr><% r.forEach(function(cell, i) { %><td class="<%= numeric[i] ? 'num' : '' %>"><%= cellText(cell, i) %></td><% }) %></tr><% }) %>
+        </tfoot>
+        <% } %>
+      </table>
+    </div>
+    <% if (report.note) { %><div class="panel-footer small text-muted"><%= report.note %></div><% } %>
+  </div>
+</div>
+<%- include('../partials/layout-end') %>

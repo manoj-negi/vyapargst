@@ -14,6 +14,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     return res.status(422).render("auth/login", {
       title: "Login",
       error: "Email and password are required.",
+      email: email ?? "",
     });
   }
 
@@ -24,6 +25,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     return res.status(401).render("auth/login", {
       title: "Login",
       error: "Invalid email or password.",
+      email,
     });
   }
 

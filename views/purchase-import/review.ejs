@@ -1,0 +1,38 @@
+<%- include('../partials/layout-start', { title: 'Review imported bill', activeNav: 'purchases' }) %>
+<%
+  var files = imp.files.map(function (f) { return { id: f.id, name: f.originalName, type: f.detectedType, rotation: f.rotation, pages: f.pageCount }; });
+  var state = {
+    id: imp.id, status: imp.status, error: imp.error, extractor: imp.extractor, draft: imp.draft, sourceData: imp.sourceData, files: files,
+    purchase: imp.purchase, suppliers: suppliers, states: states, fields: fields, aiReady: true, services: services,
+  };
+  var locked = imp.status === 'POSTED' || imp.status === 'POSTING';
+%>
+<div class="page import-review-page">
+  <%- include('../partials/page-header', {
+    title: locked ? 'Imported bill' : 'Review imported bill',
+    subtitle: locked ? 'This import is saved.' : 'Check and correct everything below. Saving the draft changes nothing; stock, prices and balances change only when you confirm.',
+    back: { href: '/purchases/import', label: 'Imports', key: '/purchases/import' },
+    actions: locked ? (imp.purchase ? '<a class="btn btn-primary" href="/purchases/' + imp.purchase.id + '">Open purchase ' + imp.purchase.invoiceNo + '</a>' : '') : '<form method="POST" action="/purchases/import/' + imp.id + '/discard" class="m-0" data-confirm="Discard this import? Nothing in your records has been changed by it." data-confirm-title="Discard import?" data-confirm-label="Discard" data-confirm-cancel="Keep"><button class="btn btn-outline-danger" type="submit">Discard</button></form>'
+  }) %>
+
+  <div class="import-tabs" role="tablist" aria-label="Show">
+    <button type="button" class="active" data-pane-tab="doc" role="tab" aria-selected="true">Document</button>
+    <button type="button" data-pane-tab="data" role="tab" aria-selected="false">Details</button>
+  </div>
+
+  <div class="import-layout">
+    <section class="import-doc panel" data-pane="doc" aria-label="Original document">
+      <div class="import-doc-files" data-doc-files></div>
+      <div class="import-doc-view" data-doc-view></div>
+    </section>
+
+    <section class="import-data" data-pane="data" aria-label="Extracted details">
+      <% if (!locked) { %><%- include('_services', { services: services }) %><% } %>
+      <div data-scan></div>
+      <div data-editor></div>
+    </section>
+  </div>
+</div>
+<script>window.__IMPORT = <%- JSON.stringify(state).replace(/</g, '\\u003c') %>;</script>
+<script src="/js/purchase-import.js"></script>
+<%- include('../partials/layout-end') %>

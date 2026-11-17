@@ -5,11 +5,11 @@ import { uploadItemImage } from "../lib/upload";
 
 export const productsRouter = Router();
 
-productsRouter.use(requireBusiness);
 
-productsRouter.get("/products", productsController.listProducts);
-productsRouter.get("/products/new", productsController.showNewProduct);
-productsRouter.post("/products", uploadItemImage.single("image"), productsController.createProduct);
-productsRouter.get("/products/:id/edit", productsController.showEditProduct);
-productsRouter.post("/products/:id", uploadItemImage.single("image"), productsController.updateProduct);
-productsRouter.post("/products/:id/delete", productsController.deleteProduct);
+productsRouter.get("/products", requireBusiness, productsController.listProducts);
+productsRouter.get("/products/new", requireBusiness, productsController.showNewProduct);
+productsRouter.post("/products", requireBusiness, uploadItemImage.single("image"), productsController.createProduct);
+productsRouter.get("/products/:id/edit", requireBusiness, productsController.showEditProduct);
+productsRouter.post("/products/:id", requireBusiness, uploadItemImage.single("image"), productsController.updateProduct);
+productsRouter.post("/products/:id/delete", requireBusiness, productsController.deleteProduct);
+productsRouter.post("/products/:id/adjust-stock", requireBusiness, productsController.adjustProductStock);

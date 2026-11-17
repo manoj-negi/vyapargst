@@ -1,0 +1,45 @@
+<%- include('../partials/layout-start', { title: title, activeNav: activeNav }) %>
+<% var fe = fieldErrors || {}; %>
+<div class="page page-narrow">
+  <%- include('../partials/page-header', {
+    title: 'Add expense',
+    subtitle: 'Recorded at the amount paid. For a supplier GST bill you want in the GST summary, add a Purchase Bill instead.',
+    back: { href: '/expenses', label: 'Expenses', key: '/expenses' }
+  }) %>
+  <%- include('../partials/form-errors', { errors: errors }) %>
+  <form method="POST" action="/expenses" data-dirty-guard novalidate>
+    <input type="hidden" name="clientToken" value="<%= values.clientToken %>">
+    <div class="panel"><section class="form-section">
+      <div class="fgrid">
+        <div class="s3"><label class="form-label" for="exDate">Date</label><input type="date" id="exDate" name="date" class="form-control" value="<%= values.date %>"></div>
+        <div class="s5">
+          <label class="form-label" for="exCat">Category <span class="req">*</span></label>
+          <input type="text" id="exCat" name="categoryName" class="form-control<%= invalid(fe, 'categoryName') %>" list="expenseCategories" required maxlength="60" value="<%= values.categoryName || '' %>" placeholder="Type or pick" autofocus>
+          <datalist id="expenseCategories"><% categoryNames.forEach(function(n) { %><option value="<%= n %>"><% }) %></datalist>
+          <%- fieldError(fe, 'categoryName') %>
+        </div>
+        <div class="s4">
+          <label class="form-label" for="exAmt">Amount <span class="req">*</span></label>
+          <div class="price-pair"><span class="rupee">₹</span><input type="number" id="exAmt" name="amount" class="form-control<%= invalid(fe, 'amount') %>" min="0.01" step="0.01" required value="<%= values.amount || '' %>" placeholder="0.00"></div>
+          <%- fieldError(fe, 'amount') %>
+        </div>
+        <div class="s3">
+          <label class="form-label" for="exMode">Paid by</label>
+          <select id="exMode" name="mode" class="form-select<%= invalid(fe, 'mode') %>">
+            <% [['CASH','Cash'],['UPI','UPI'],['BANK_TRANSFER','Bank transfer'],['CARD','Card'],['OTHER','Other']].forEach(function(m) { %><option value="<%= m[0] %>" <%= values.mode === m[0] ? 'selected' : '' %>><%= m[1] %></option><% }) %>
+          </select>
+        </div>
+        <div class="s5"><label class="form-label" for="exTo">Paid to</label><input type="text" id="exTo" name="paidTo" class="form-control" maxlength="100" value="<%= values.paidTo || '' %>"></div>
+        <div class="s12"><label class="form-label" for="exNote">Note</label><input type="text" id="exNote" name="note" class="form-control" maxlength="300" value="<%= values.note || '' %>"></div>
+      </div>
+    </section></div>
+    <div class="action-bar">
+      <span class="hint"><span class="req">*</span> Required</span>
+      <div class="btns">
+        <a href="/expenses" class="btn btn-outline-secondary" data-back-to="/expenses">Cancel</a>
+        <button type="submit" class="btn btn-primary" data-shortcut-save><i class="icon-check"></i> Save expense</button>
+      </div>
+    </div>
+  </form>
+</div>
+<%- include('../partials/layout-end') %>

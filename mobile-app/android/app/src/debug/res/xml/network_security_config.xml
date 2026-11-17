@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only (src/debug overrides src/main): allows plain HTTP to a development backend on
+     your Mac (10.0.2.2 from the emulator, or the Mac's Wi-Fi address from a phone). Release builds use
+     src/main/res/xml/network_security_config.xml, which allows HTTPS only. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

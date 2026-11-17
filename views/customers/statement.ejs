@@ -1,0 +1,75 @@
+<%- include('../partials/layout-start', { title: title, activeNav: activeNav }) %>
+<%
+  function bal(d) { var n = Number(d); return inr(Math.abs(n)) + (n > 0 ? ' Dr' : (n < 0 ? ' Cr' : '')); }
+  var closing = Number(statement.closingBalance);
+  var qs = 'from=' + encodeURIComponent(filters.from) + '&to=' + encodeURIComponent(filters.to);
+  var acts = '<a href="/payments/new?direction=IN&partyId=' + party.id + '" class="btn btn-outline-secondary"><i class="icon-hand-coins"></i> Payment in</a>' +
+    '<a href="/payments/new?direction=OUT&partyId=' + party.id + '" class="btn btn-outline-secondary"><i class="icon-banknote"></i> Payment out</a>' +
+    '<a href="/customers/' + party.id + '/edit" class="btn btn-outline-secondary"><i class="icon-pencil"></i> Edit</a>' +
+    '<div class="dropdown"><button class="btn btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false"><i class="icon-download"></i> Export</button><ul class="dropdown-menu dropdown-menu-end">' +
+    '<li><a class="dropdown-item" href="/customers/' + party.id + '?' + qs + '&format=pdf"><i class="icon-file-text"></i> PDF</a></li>' +
+    '<li><a class="dropdown-item" href="/customers/' + party.id + '?' + qs + '&format=csv"><i class="icon-sheet"></i> CSV (Excel)</a></li></ul></div>';
+%>
+<div class="page page-medium">
+  <%- include('../partials/page-header', {
+    title: party.name,
+    badge: '<span class="badge-soft">' + partyLabel + '</span>',
+    subtitle: [party.phone, party.gstin, party.state].filter(Boolean).join(' · '),
+    back: { href: '/customers', label: 'Parties', key: '/customers' },
+    actions: acts
+  }) %>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label"><%= closing > 0 ? 'To receive' : (closing < 0 ? 'To pay' : 'Balance') %></div><div class="kpi-value <%= closing > 0 ? 'text-success' : (closing < 0 ? 'text-danger' : '') %>"><%= closing === 0 ? 'Settled' : inr(Math.abs(closing)) %></div><div class="kpi-sub"><%= filters.to ? 'As of ' + filters.to : 'As of today' %></div></div>
+    <div class="kpi"><div class="kpi-label">Debits in period</div><div class="kpi-value"><%= inr(statement.totalDebit) %></div></div>
+    <div class="kpi"><div class="kpi-label">Credits in period</div><div class="kpi-value"><%= inr(statement.totalCredit) %></div></div>
+    <div class="kpi"><div class="kpi-label">Unsettled documents</div><div class="kpi-value"><%= openDocs.length %></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header"><h2 class="panel-title">Statement</h2><span class="small text-muted">Dr = <%= party.name %> owes you · Cr = you owe <%= party.name %></span></div>
+    <form method="GET" class="filter-bar">
+      <div class="f f-date"><label class="form-label" for="sf">From</label><input type="date" id="sf" name="from" class="form-control form-control-sm" value="<%= filters.from %>"></div>
+      <div class="f f-date"><label class="form-label" for="st">To</label><input type="date" id="st" name="to" class="form-control form-control-sm" value="<%= filters.to %>"></div>
+      <div class="f-actions" style="margin-left:0"><button class="btn btn-sm btn-primary">Apply</button><% if (filters.from || filters.to) { %><a href="/customers/<%= party.id %>" class="btn btn-sm btn-outline-secondary">All time</a><% } %></div>
+    </form>
+    <div class="table-scroll">
+      <table class="table table-app">
+        <thead><tr><th style="width:120px">Date</th><th>Type</th><th style="width:150px">Number</th><th class="num" style="width:140px">Debit</th><th class="num" style="width:140px">Credit</th><th class="num" style="width:160px">Balance</th></tr></thead>
+        <tbody>
+          <tr class="table-light"><td class="nowrap"><%= filters.from ? fdate(filters.from) : '' %></td><td colspan="4" class="fw-semibold">Opening balance</td><td class="num fw-semibold"><%= bal(statement.openingBalance) %></td></tr>
+          <% if (!statement.entries.length) { %><tr><td colspan="6"><div class="empty-state py-4">No transactions in this period.</div></td></tr><% } %>
+          <% statement.entries.forEach(function(e) { %>
+            <tr>
+              <td class="nowrap"><%= fdate(e.date) %></td>
+              <td><%= e.kind %></td>
+              <td><% if (e.link) { %><a href="<%= e.link %>" class="cell-main"><%= e.number %></a><% } else { %><%= e.number %><% } %></td>
+              <td class="num"><%= Number(e.debit) ? inr(e.debit) : '' %></td>
+              <td class="num"><%= Number(e.credit) ? inr(e.credit) : '' %></td>
+              <td class="num"><%= bal(e.balance) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+        <tfoot><tr><td></td><td colspan="2">Total</td><td class="num"><%= inr(statement.totalDebit) %></td><td class="num"><%= inr(statement.totalCredit) %></td><td class="num"><%= bal(statement.closingBalance) %></td></tr></tfoot>
+      </table>
+    </div>
+    <div class="panel-footer small text-muted">Cancelled documents and payments are excluded; estimates do not affect the balance.</div>
+  </div>
+
+  <% if (openDocs.length) { %>
+  <div class="panel">
+    <div class="panel-header"><h2 class="panel-title">Unsettled documents</h2></div>
+    <div class="table-scroll">
+      <table class="table table-app">
+        <thead><tr><th style="width:120px">Date</th><th>Number</th><th class="num" style="width:140px">Total</th><th class="num" style="width:140px">Balance</th></tr></thead>
+        <tbody>
+          <% openDocs.forEach(function(d) { %>
+            <tr><td class="nowrap"><%= fdate(d.invoiceDate) %></td><td class="cell-main"><%= d.invoiceNo %></td><td class="num"><%= inr(d.total) %></td><td class="num text-danger"><%= inr(d.balance) %></td></tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <% } %>
+</div>
+<%- include('../partials/layout-end') %>

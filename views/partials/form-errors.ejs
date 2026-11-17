@@ -1,0 +1,7 @@
+<%# Summary of validation errors at the top of a form; individual fields also show their own message. %>
+<% if (typeof errors !== 'undefined' && errors && errors.length) { %>
+  <div class="alert alert-danger" role="alert" data-form-errors>
+    <div class="alert-title"><%= errors.length === 1 ? 'Please fix this before saving:' : 'Please fix these ' + errors.length + ' things before saving:' %></div>
+    <ul><% errors.forEach(function(e) { %><li><%= e %></li><% }) %></ul>
+  </div>
+<% } %>

@@ -5,11 +5,19 @@ import puppeteer from "puppeteer";
 
 let browserPromise: ReturnType<typeof puppeteer.launch> | null = null;
 
-function getBrowser() {
-  if (!browserPromise) {
-    browserPromise = puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
+async function getBrowser() {
+  if (browserPromise) {
+    const browser = await browserPromise.catch(() => null);
+    if (browser?.connected) return browser;
+    browserPromise = null;
   }
-  return browserPromise;
+  const launching = puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
+  browserPromise = launching;
+  // Chromium can die (crash, OS sleep, killed process); drop the cached instance so the next call relaunches.
+  launching
+    .then((browser) => browser.once("disconnected", () => { if (browserPromise === launching) browserPromise = null; }))
+    .catch(() => { if (browserPromise === launching) browserPromise = null; });
+  return launching;
 }
 
 /**
@@ -18,12 +26,25 @@ function getBrowser() {
  */
 export async function renderInvoicePdf(templateData: Record<string, unknown>): Promise<Buffer> {
   const templatePath = path.join(__dirname, "../../../views/invoices/pdf.ejs");
-  const business = templateData.business as { logoPath?: string | null } | undefined;
+  const business = templateData.business as { logoPath?: string | null; signaturePath?: string | null } | undefined;
+  const stamp = templateData.stamp as { src: string } | null | undefined;
   const html = await ejs.renderFile(templatePath, {
     ...templateData,
-    business: business?.logoPath ? { ...business, logoPath: await inlineImage(business.logoPath) } : business,
+    business: business
+      ? {
+          ...business,
+          logoPath: business.logoPath ? await inlineImage(business.logoPath) : null,
+          signaturePath: business.signaturePath ? await inlineImage(business.signaturePath) : null,
+        }
+      : business,
+    // The PDF page has no base URL, so the stamp is embedded like the logo
+    stamp: stamp ? { ...stamp, src: await inlineImage(stamp.src) } : null,
   });
+  return renderHtmlToPdf(html);
+}
 
+/** Renders a complete HTML page to an A4 PDF; the page's own @page rule sets size and margins. */
+export async function renderHtmlToPdf(html: string): Promise<Buffer> {
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {

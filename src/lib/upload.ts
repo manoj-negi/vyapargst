@@ -14,7 +14,8 @@ const ALLOWED_LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "im
 
 export const uploadLogo = multer({
   storage: logoStorage,
-  limits: { fileSize: 2 * 1024 * 1024 },
+  // 8 MB so a phone photo of the stamp & signature fits; the logo is still checked against 2 MB
+  limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (!ALLOWED_LOGO_TYPES.has(file.mimetype)) {
       return cb(new Error("Only PNG, JPEG, WEBP or SVG logos are allowed"));

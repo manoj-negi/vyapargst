@@ -1,0 +1,25 @@
+<%- include('../partials/layout-start', { title: title, activeNav: activeNav }) %>
+<%
+  var meta = {
+    sales: ['icon-file-text', 'Invoices and credit notes with tax split, by date'],
+    purchases: ['icon-shopping-cart', 'Purchase bills and debit notes with supplier bill numbers'],
+    expenses: ['icon-wallet', 'Expenses with totals per category'],
+    'stock-summary': ['icon-package', 'Stock on hand, low-stock flags and value at purchase price'],
+    'stock-movement': ['icon-arrow-left-right', 'Every stock in/out with its reference document'],
+    receivables: ['icon-arrow-down-left', 'Parties who owe you, by net balance'],
+    payables: ['icon-arrow-up-right', 'Parties you owe, by net balance'],
+    'gst-summary': ['icon-percent', 'Rate-wise output and input tax, HSN-wise outward summary'],
+    'cash-bank': ['icon-landmark', 'Money in and out by payment mode']
+  };
+%>
+<div class="page page-medium">
+  <%- include('../partials/page-header', { title: 'Reports', subtitle: 'Every report has date filters where they apply, and exports to PDF and CSV (opens in Excel).' }) %>
+  <div class="tile-grid">
+    <% reports.forEach(function(r) { var m = meta[r.key] || ['icon-file', '']; %>
+      <a href="/reports/<%= r.key %>" class="tile"><span class="tile-icon"><i class="<%= m[0] %>"></i></span><span><span class="tile-title d-block"><%= r.label %></span><span class="tile-desc d-block"><%= m[1] %></span></span></a>
+    <% }) %>
+    <a href="/customers" class="tile"><span class="tile-icon"><i class="icon-book-open"></i></span><span><span class="tile-title d-block">Party statements</span><span class="tile-desc d-block">Open a party to see its ledger with running balance</span></span></a>
+  </div>
+  <div class="alert alert-secondary mt-3 mb-0">There is no Profit &amp; Loss report: cost of goods sold is not tracked, so a profit figure would not be reliable. The GST summary is for checking figures; this app does not file returns.</div>
+</div>
+<%- include('../partials/layout-end') %>

@@ -28,9 +28,30 @@ export async function allocateInvoiceNumber(
   settings: NumberingSettings,
   invoiceDate: Date
 ): Promise<string> {
+  return allocateNumber(tx, businessId, settings.invoicePrefix, settings, invoiceDate);
+}
+
+/** GST Rule 46(b): a tax invoice serial number may not exceed 16 characters. */
+export const MAX_DOCUMENT_NUMBER_LENGTH = 16;
+
+/** Longest number a prefix can produce (4-digit counter, plus "YYYY-YY/" when FY numbering is on). */
+export function sampleDocumentNumber(prefix: string, financialYearFormat: boolean, date = new Date()): string {
+  return financialYearFormat ? `${prefix}${computeFinancialYear(date)}/0001` : `${prefix}0001`;
+}
+
+/**
+ * Allocates the next number in the series identified by prefix (+ financial year when enabled).
+ * Each document type uses its own prefix, so each gets its own consecutive series.
+ */
+export async function allocateNumber(
+  tx: TxClient,
+  businessId: string,
+  prefix: string,
+  settings: Pick<NumberingSettings, "invoiceStartNumber" | "financialYearFormat">,
+  invoiceDate: Date
+): Promise<string> {
   // "" (not null) when FY numbering is off — see schema comment on InvoiceSequence.financialYear.
   const financialYear = settings.financialYearFormat ? computeFinancialYear(invoiceDate) : "";
-  const prefix = settings.invoicePrefix;
 
   const sequence = await tx.invoiceSequence.upsert({
     where: {

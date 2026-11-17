@@ -1,22 +1,23 @@
-<%- include('../partials/layout-start', { title: customer && customer.id ? 'Edit Customer' : 'Add Customer', activeNav: 'customers' }) %>
-
-<div class="card p-4" style="max-width: 720px;">
-  <h5 class="fw-bold mb-3"><%= customer && customer.id ? 'Edit Customer' : 'Add Customer' %></h5>
-
-  <% if (errors && errors.length) { %>
-    <div class="alert alert-danger py-2 small">
-      <ul class="mb-0 ps-3"><% errors.forEach(function(e) { %><li><%= e %></li><% }) %></ul>
+<% var isEdit = !!(customer && customer.id); var isSupplier = customer && customer.partyType === 'SUPPLIER'; %>
+<%- include('../partials/layout-start', { title: isEdit ? 'Edit ' + customer.name : 'Add Party', activeNav: isSupplier ? 'suppliers' : 'customers' }) %>
+<div class="page page-narrow">
+  <%- include('../partials/page-header', {
+    title: isEdit ? 'Edit ' + customer.name : (isSupplier ? 'Add supplier' : 'Add party'),
+    subtitle: 'Customers and suppliers share one list; a party can be both.',
+    back: isEdit ? { href: '/customers/' + customer.id, label: 'Statement' } : { href: '/customers', label: 'Parties', key: '/customers' }
+  }) %>
+  <%- include('../partials/form-errors', { errors: errors }) %>
+  <form method="POST" action="<%= isEdit ? '/customers/' + customer.id : '/customers' %>" data-dirty-guard novalidate>
+    <div class="panel">
+      <%- include('_fields', { customer: customer, states: states, defaultState: typeof business !== 'undefined' && business ? business.state : '' }) %>
     </div>
-  <% } %>
-
-  <form method="POST" action="<%= customer && customer.id ? '/customers/' + customer.id : '/customers' %>">
-    <%- include('_fields', { customer: customer, states: states, defaultState: '' }) %>
-
-    <div class="mt-4 d-flex gap-2">
-      <button type="submit" class="btn btn-primary-app px-4" data-shortcut-save>Save Customer</button>
-      <a href="/customers" class="btn btn-outline-secondary px-4">Cancel</a>
+    <div class="action-bar">
+      <span class="hint"><span class="req">*</span> Required</span>
+      <div class="btns">
+        <a href="<%= isEdit ? '/customers/' + customer.id : '/customers' %>" class="btn btn-outline-secondary" <%- isEdit ? '' : 'data-back-to="/customers"' %>>Cancel</a>
+        <button type="submit" class="btn btn-primary" data-shortcut-save><i class="icon-check"></i> <%= isEdit ? 'Save changes' : 'Save party' %></button>
+      </div>
     </div>
   </form>
 </div>
-
 <%- include('../partials/layout-end') %>

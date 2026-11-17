@@ -1,0 +1,142 @@
+<%- include('../partials/layout-start', { title: title, activeNav: activeNav }) %>
+<% var alloc = values.alloc || {}; var fe = fieldErrors || {}; var isIn = direction === 'IN';
+   var modes = [['CASH','Cash'],['UPI','UPI'],['BANK_TRANSFER','Bank transfer'],['CARD','Card'],['OTHER','Other']]; %>
+<div class="page page-narrow">
+  <%- include('../partials/page-header', {
+    title: isIn ? 'Payment in' : 'Payment out',
+    subtitle: isIn ? 'Money received from a party: a customer paying, or a supplier refunding a debit note.' : 'Money paid to a party: paying a supplier, or refunding a customer against a credit note.',
+    back: { href: '/payments?direction=' + direction, label: isIn ? 'Payments in' : 'Payments out', key: '/payments' }
+  }) %>
+  <%- include('../partials/form-errors', { errors: errors }) %>
+
+  <form method="POST" action="/payments" id="paymentForm" data-dirty-guard novalidate>
+    <input type="hidden" name="direction" value="<%= direction %>">
+    <input type="hidden" name="clientToken" value="<%= values.clientToken %>">
+    <div class="panel">
+      <section class="form-section">
+        <div class="fgrid">
+          <div class="s6">
+            <label class="form-label" for="payParty">Party <span class="req">*</span></label>
+            <select name="partyId" id="payParty" class="form-select<%= invalid(fe, 'partyId') %>" required>
+              <option value="">Select party</option>
+              <% parties.forEach(function(p) { %><option value="<%= p.id %>" <%= values.partyId === p.id ? 'selected' : '' %>><%= p.name %><%= p.section ? ' (' + p.section + ')' : '' %></option><% }) %>
+            </select>
+            <%- fieldError(fe, 'partyId') %>
+            <div class="form-text">Choosing a party lists their unsettled bills below.</div>
+          </div>
+          <div class="s3">
+            <label class="form-label" for="payDate">Date</label>
+            <input type="date" id="payDate" name="date" class="form-control" value="<%= typeof values.date === 'string' ? values.date : new Date(values.date).toISOString().slice(0,10) %>">
+          </div>
+          <div class="s3">
+            <label class="form-label" for="amountInput">Amount <span class="req">*</span></label>
+            <div class="price-pair"><span class="rupee">₹</span><input type="number" name="amount" id="amountInput" class="form-control<%= invalid(fe, 'amount') %>" min="0.01" step="0.01" required value="<%= values.amount || '' %>" placeholder="0.00"></div>
+            <%- fieldError(fe, 'amount') %>
+          </div>
+          <div class="s3">
+            <label class="form-label" for="payMode">Mode <span class="req">*</span></label>
+            <select name="mode" id="payMode" class="form-select<%= invalid(fe, 'mode') %>">
+              <% modes.forEach(function(m) { %><option value="<%= m[0] %>" <%= values.mode === m[0] ? 'selected' : '' %>><%= m[1] %></option><% }) %>
+            </select>
+            <%- fieldError(fe, 'mode') %>
+          </div>
+          <div class="s4">
+            <label class="form-label" for="payRef">Reference <span class="text-muted fw-normal">(UTR / cheque no.)</span></label>
+            <input type="text" id="payRef" name="reference" class="form-control" maxlength="60" value="<%= values.reference || '' %>">
+          </div>
+          <div class="s5">
+            <label class="form-label" for="payNote">Note</label>
+            <input type="text" id="payNote" name="note" class="form-control" maxlength="300" value="<%= values.note || '' %>">
+          </div>
+        </div>
+      </section>
+
+      <% if (values.partyId) { %>
+      <section class="form-section">
+        <div class="form-section-head d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <h2 class="form-section-title">Settle against</h2>
+            <div class="form-section-desc">Any amount not settled against a bill stays on the party's account as an advance.</div>
+          </div>
+          <div class="segmented" role="radiogroup" aria-label="Allocation">
+            <input class="btn-check" type="radio" name="allocationMode" id="allocAuto" value="AUTO" <%= values.allocationMode !== 'MANUAL' ? 'checked' : '' %>><label for="allocAuto">Oldest bills first</label>
+            <input class="btn-check" type="radio" name="allocationMode" id="allocManual" value="MANUAL" <%= values.allocationMode === 'MANUAL' ? 'checked' : '' %>><label for="allocManual">Choose amounts</label>
+          </div>
+        </div>
+        <% if (openDocs.length === 0) { %>
+          <div class="alert alert-secondary mb-0">No unsettled bills for this party. The full amount will be kept as an advance.</div>
+        <% } else { %>
+        <div class="table-scroll border rounded">
+          <table class="table table-app">
+            <thead><tr><th style="width:110px">Date</th><th>Document</th><th class="num" style="width:130px">Total</th><th class="num" style="width:130px">Balance</th><th style="width:160px" class="num">Settle now</th></tr></thead>
+            <tbody>
+              <% openDocs.forEach(function(d) { %>
+              <tr>
+                <td class="nowrap"><%= fdate(d.invoiceDate) %></td>
+                <td><span class="cell-main"><%= d.invoiceNo %></span> <span class="cell-sub"><%= d.label %></span></td>
+                <td class="num"><%= inr(d.total) %></td>
+                <td class="num"><%= inr(d.balance) %></td>
+                <td><div class="price-pair"><span class="rupee">₹</span><input type="number" name="alloc[<%= d.id %>]" class="form-control form-control-sm alloc-input" min="0" step="0.01" max="<%= Number(d.balance) %>" value="<%= alloc[d.id] || '' %>" aria-label="Amount to settle on <%= d.invoiceNo %>"></div></td>
+              </tr>
+              <% }) %>
+            </tbody>
+            <tfoot><tr><td colspan="4" class="text-end">Allocated</td><td class="num" id="allocTotal">₹0.00</td></tr></tfoot>
+          </table>
+        </div>
+        <% } %>
+      </section>
+      <% } %>
+    </div>
+
+    <div class="action-bar">
+      <span class="hint" id="allocHint"></span>
+      <div class="btns">
+        <a href="/payments?direction=<%= direction %>" class="btn btn-outline-secondary" data-back-to="/payments">Cancel</a>
+        <button type="submit" class="btn btn-primary" data-shortcut-save><i class="icon-check"></i> Save payment</button>
+      </div>
+    </div>
+  </form>
+</div>
+<script>
+  (function () {
+    var form = document.getElementById('paymentForm');
+    var party = document.getElementById('payParty');
+    // Reload with the chosen party to list their open bills (pick the party first, then the amount)
+    var initialParty = party.value;
+    party.addEventListener('change', function () {
+      var url = '/payments/new?' + new URLSearchParams({ direction: '<%= direction %>', partyId: party.value }).toString();
+      // Only the party changed: reload without asking. Anything else typed: ask before it is lost.
+      var chosen = party.value;
+      party.value = initialParty;
+      var otherChanges = window.AppNav.isDirty();
+      party.value = chosen;
+      if (!otherChanges) { window.AppNav.leave(url); return; }
+      window.AppDialog.unsaved().then(function (discard) {
+        if (discard) window.AppNav.leave(url);
+        else party.value = initialParty;
+      });
+    });
+    var amount = document.getElementById('amountInput');
+    var inputs = form.querySelectorAll('.alloc-input');
+    var total = document.getElementById('allocTotal');
+    var hint = document.getElementById('allocHint');
+    function fmt(n) { return '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function sync() {
+      if (!inputs.length) return;
+      var manual = document.getElementById('allocManual').checked;
+      var sum = 0;
+      inputs.forEach(function (i) { sum += Number(i.value || 0); });
+      if (total) total.textContent = manual ? fmt(sum) : 'Automatic';
+      var amt = Number(amount.value || 0);
+      hint.textContent = manual && amt ? (sum > amt ? 'Allocated is more than the payment amount' : 'Advance left on account: ' + fmt(amt - sum)) : '';
+      hint.classList.toggle('text-danger', manual && sum > amt);
+    }
+    inputs.forEach(function (input) {
+      input.addEventListener('input', function () { document.getElementById('allocManual').checked = true; sync(); });
+    });
+    form.querySelectorAll('input[name=allocationMode]').forEach(function (r) { r.addEventListener('change', sync); });
+    amount.addEventListener('input', sync);
+    sync();
+  })();
+</script>
+<%- include('../partials/layout-end') %>

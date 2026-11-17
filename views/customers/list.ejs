@@ -1,41 +1,79 @@
-<%- include('../partials/layout-start', { title: 'Customers', activeNav: 'customers' }) %>
+<%- include('../partials/layout-start', { title: title, activeNav: activeNav }) %>
+<div class="page" data-list-key="/customers">
+  <%- include('../partials/page-header', {
+    title: title,
+    subtitle: 'Balances are worked out from every invoice, bill, return and payment, so they are always current.',
+    actions: '<a href="/payments/new?direction=IN" class="btn btn-outline-secondary"><i class="icon-hand-coins"></i> Payment in</a><a href="/customers/new' + (type === 'supplier' ? '?type=supplier' : '') + '" class="btn btn-primary"><i class="icon-user-plus"></i> Add party</a>'
+  }) %>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <form method="GET" action="/customers" class="d-flex gap-2">
-    <input type="text" name="q" class="form-control form-control-sm" style="width: 260px" placeholder="Search name, phone or GSTIN" value="<%= q %>">
-    <button type="submit" class="btn btn-sm btn-outline-secondary">Search</button>
-  </form>
-  <a href="/customers/new" class="btn btn-accent"><i class="icon-plus"></i> Add Customer</a>
-</div>
+  <div class="kpi-grid">
+    <a class="kpi" href="/reports/receivables"><div class="kpi-label">To receive</div><div class="kpi-value text-success"><%= inr(totals.toReceive) %></div></a>
+    <a class="kpi" href="/reports/payables"><div class="kpi-label">To pay</div><div class="kpi-value text-danger"><%= inr(totals.toPay) %></div></a>
+    <div class="kpi"><div class="kpi-label">Parties</div><div class="kpi-value"><%= customers.length %></div></div>
+  </div>
 
-<div class="card">
-  <div class="table-scroll">
-    <table class="table table-app mb-0">
-      <thead>
-        <tr><th>Name</th><th>Phone</th><th>GSTIN</th><th>Type</th><th>State</th><th></th></tr>
-      </thead>
-      <tbody>
-        <% if (customers.length === 0) { %>
-          <tr><td colspan="6">
-            <div class="empty-state">
-              <i class="icon-users"></i>
-              No customers yet. <a href="/customers/new">Add your first customer</a>.
-            </div>
-          </td></tr>
-        <% } %>
-        <% customers.forEach(function(c) { %>
+  <div class="panel">
+    <form method="GET" action="/customers" class="filter-bar" role="search">
+      <div class="chips align-self-end me-2" role="tablist" aria-label="Party type">
+        <a class="chip <%= !type ? 'active' : '' %>" href="/customers<%= q ? '?q=' + encodeURIComponent(q) : '' %>">All</a>
+        <a class="chip <%= type === 'customer' ? 'active' : '' %>" href="/customers?type=customer<%= q ? '&q=' + encodeURIComponent(q) : '' %>">Customers</a>
+        <a class="chip <%= type === 'supplier' ? 'active' : '' %>" href="/customers?type=supplier<%= q ? '&q=' + encodeURIComponent(q) : '' %>">Suppliers</a>
+      </div>
+      <input type="hidden" name="type" value="<%= type %>">
+      <div class="f f-search">
+        <label class="form-label" for="pq">Search</label>
+        <div class="search-input"><i class="icon-search"></i><input type="search" id="pq" name="q" class="form-control form-control-sm" placeholder="Name, phone or GSTIN" value="<%= q %>"></div>
+      </div>
+      <div class="f-actions">
+        <% if (q) { %><a href="/customers<%= type ? '?type=' + type : '' %>" class="btn btn-sm btn-outline-secondary">Clear</a><% } %>
+        <button type="submit" class="btn btn-sm btn-primary"><i class="icon-search"></i> Search</button>
+      </div>
+    </form>
+    <div class="table-scroll sticky">
+      <table class="table table-app" data-sortable data-page-size="50">
+        <thead>
           <tr>
-            <td><a href="/customers/<%= c.id %>/edit" class="fw-semibold"><%= c.name %><%= c.section ? ' (' + c.section + ')' : '' %></a></td>
-            <td><%= c.phone || '-' %></td>
-            <td><%= c.gstin || '-' %></td>
-            <td><%= c.customerType %></td>
-            <td><%= c.state %></td>
-            <td><a href="/customers/<%= c.id %>/edit" class="btn btn-sm btn-outline-secondary">Edit</a></td>
+            <th data-sort="text">Name</th>
+            <th data-sort="text" style="width:150px">Type</th>
+            <th data-sort="text" style="width:130px">Phone</th>
+            <th data-sort="text" style="width:170px">GSTIN</th>
+            <th data-sort="text" style="width:140px">State</th>
+            <th data-sort="num" class="num" style="width:160px">Balance</th>
+            <th class="text-end" style="width:150px"><span class="visually-hidden">Actions</span></th>
           </tr>
-        <% }) %>
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          <% if (customers.length === 0) { %>
+            <tr data-static><td colspan="7"><div class="empty-state"><i class="icon-users"></i>
+              <div class="title"><%= q ? 'No parties match “' + q + '”' : 'No parties yet' %></div>
+              <a href="/customers/new" class="btn btn-sm btn-primary"><i class="icon-user-plus"></i> Add party</a>
+            </div></td></tr>
+          <% } %>
+          <% customers.forEach(function(c) { %>
+            <tr>
+              <td>
+                <a href="/customers/<%= c.id %>" class="cell-main d-block cell-truncate" title="<%= c.name %>"><%= c.name %></a>
+                <% if (c.section || c.department) { %><div class="cell-sub"><%= [c.section, c.department].filter(Boolean).join(' · ') %></div><% } %>
+              </td>
+              <td><span class="badge-soft"><%= c.partyLabel %></span></td>
+              <td class="muted nowrap"><%= c.phone || '—' %></td>
+              <td class="muted nowrap"><%= c.gstin || '—' %></td>
+              <td><%= c.state %></td>
+              <td class="num" data-sort-value="<%= c.balance %>">
+                <span class="<%= c.balance > 0 ? 'text-success fw-semibold' : (c.balance < 0 ? 'text-danger fw-semibold' : 'muted') %>"><%= inr(Math.abs(c.balance)) %></span>
+                <% if (c.balance !== 0) { %><div class="cell-sub"><%= c.balance > 0 ? 'to receive' : 'to pay' %></div><% } %>
+              </td>
+              <td>
+                <div class="row-actions">
+                  <a href="/customers/<%= c.id %>/edit" class="btn btn-sm btn-outline-secondary btn-icon" title="Edit <%= c.name %>" aria-label="Edit <%= c.name %>"><i class="icon-pencil"></i></a>
+                  <a href="/customers/<%= c.id %>" class="btn btn-sm btn-outline-secondary">Statement</a>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
-
 <%- include('../partials/layout-end') %>

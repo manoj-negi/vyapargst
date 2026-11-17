@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title><%= report.title %></title>
+  <style>
+    @page { size: A4 landscape; margin: 10mm; }
+    body { font-family: "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif; font-size: 10.5px; color: #1f2937; margin: 0; }
+    h1 { font-size: 16px; margin: 0 0 2px; }
+    .sub { color: #4b5563; margin-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #9ca3af; padding: 3px 5px; text-align: left; vertical-align: top; }
+    th { background: #f3f4f6; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    td.num, th.num { text-align: right; white-space: nowrap; }
+    tr { break-inside: avoid; }
+    thead { display: table-header-group; }
+    .note { margin-top: 8px; color: #4b5563; }
+  </style>
+</head>
+<body>
+  <h1><%= report.business.name %> — <%= report.title %></h1>
+  <div class="sub">
+    <% if (report.business.gstin) { %>GSTIN <%= report.business.gstin %> · <% } %>
+    <% if (report.subtitle) { %><%= report.subtitle %> · <% } %>
+    Generated <%= generatedAt.toLocaleString('en-IN') %>
+  </div>
+  <% var numeric = report.columns.map(function(c) { return /₹|Qty|Stock|Rate|Value|Amount|Count|%/i.test(c); }); %>
+  <table>
+    <thead><tr><% report.columns.forEach(function(c, i) { %><th class="<%= numeric[i] ? 'num' : '' %>"><%= c %></th><% }) %></tr></thead>
+    <tbody>
+      <% report.rows.forEach(function(r) { %>
+        <tr><% r.forEach(function(cell, i) { %><td class="<%= numeric[i] ? 'num' : '' %>"><%= cell === null || cell === undefined ? '' : cell %></td><% }) %></tr>
+      <% }) %>
+      <% if (report.rows.length === 0) { %><tr><td colspan="<%= report.columns.length %>">No records for this period.</td></tr><% } %>
+    </tbody>
+  </table>
+  <% if (report.note) { %><div class="note"><%= report.note %></div><% } %>
+</body>
+</html>

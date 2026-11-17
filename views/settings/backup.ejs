@@ -1,0 +1,41 @@
+<%- include('../partials/layout-start', { title: title, activeNav: activeNav }) %>
+<div class="page page-medium">
+  <%- include('../partials/page-header', {
+    title: 'Backup',
+    subtitle: 'Each backup holds the whole database and every uploaded file (logos, signatures, item images), with checksums so damage is detected.',
+    actions: '<form method="POST" action="/settings/backup" class="m-0" data-loading-label="Creating backup…"><button class="btn btn-primary"><i class="icon-database-backup"></i> Create backup now</button></form>'
+  }) %>
+  <div class="d-grid gap-3 settings-split">
+    <div class="panel">
+      <div class="panel-header"><h2 class="panel-title">Backups</h2><span class="small text-muted">Folder: <code><%= backupDir %></code></span></div>
+      <div class="table-scroll">
+        <table class="table table-app">
+          <thead><tr><th>Backup</th><th style="width:170px">Created</th><th class="num" style="width:90px">Documents</th><th class="num" style="width:80px">Parties</th><th class="num" style="width:70px">Items</th><th class="num" style="width:90px">Size</th></tr></thead>
+          <tbody>
+            <% if (!backups.length) { %><tr><td colspan="6"><div class="empty-state"><i class="icon-database"></i><div class="title">No backups yet</div>Create one before making big changes.</div></td></tr><% } %>
+            <% backups.forEach(function(b) { %>
+              <tr>
+                <td><code class="cell-truncate d-inline-block" title="<%= b.name %>"><%= b.name %></code><% if (!b.manifest) { %><div class="cell-sub">Older format, restore manually</div><% } %></td>
+                <td class="nowrap"><%= b.manifest ? fdate(b.manifest.createdAt) + ' ' + new Date(b.manifest.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—' %></td>
+                <td class="num"><%= b.manifest ? b.manifest.counts.SaleInvoice : '—' %></td>
+                <td class="num"><%= b.manifest ? b.manifest.counts.Customer : '—' %></td>
+                <td class="num"><%= b.manifest ? b.manifest.counts.Product : '—' %></td>
+                <td class="num"><%= (b.sizeBytes / 1024 / 1024).toFixed(2) %> MB</td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><h2 class="panel-title">Restoring</h2></div>
+      <div class="panel-body small">
+        <p class="mt-0">Restoring replaces the current data, so it runs from the terminal with the app stopped:</p>
+        <pre class="bg-light border rounded p-2 small mb-2" style="white-space:pre-wrap">npm run restore -- "<%= backupDir %>/&lt;backup-folder&gt;" --confirm</pre>
+        <p>It checks the backup, saves the current data as a new backup first, restores into a separate database and compares record counts and totals before switching over. The previous database and uploads folder are kept, renamed, so nothing is deleted.</p>
+        <p class="mb-0 text-warning"><strong>Copy backups to another drive or cloud folder regularly.</strong> A backup on the same disk does not survive a disk failure.</p>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/layout-end') %>

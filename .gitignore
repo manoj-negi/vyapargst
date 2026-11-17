@@ -2,7 +2,13 @@ node_modules/
 dist/
 .env
 *.log
+# Uploaded files never go into git (backups cover them); only the folder placeholders are tracked
+/public/uploads/*
+!/public/uploads/logos/
+!/public/uploads/items/
 public/uploads/logos/*
 !public/uploads/logos/.gitkeep
 public/uploads/items/*
 !public/uploads/items/.gitkeep
+.DS_Store
+public/uploads.before-restore-*

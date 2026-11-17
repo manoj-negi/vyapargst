@@ -1,0 +1,15 @@
+<%#
+  Shared page header.
+  include('../partials/page-header', { title, subtitle?, badge? (html), back? { href, label, key? }, actions? (html) })
+  back.key makes the link return to the list with the filters the user last applied (public/js/app.js).
+%>
+<div class="page-header no-print">
+  <div class="page-header-main">
+    <% if (typeof back !== 'undefined' && back) { %>
+      <a href="<%= back.href %>" class="page-back"<% if (back.key) { %> data-back-to="<%= back.key %>"<% } %>><i class="icon-arrow-left"></i> <%= back.label %></a>
+    <% } %>
+    <h1 class="page-title"><%= title %><% if (typeof badge !== 'undefined' && badge) { %> <%- badge %><% } %></h1>
+    <% if (typeof subtitle !== 'undefined' && subtitle) { %><div class="page-subtitle"><%= subtitle %></div><% } %>
+  </div>
+  <% if (typeof actions !== 'undefined' && actions) { %><div class="page-actions"><%- actions %></div><% } %>
+</div>

@@ -4,6 +4,9 @@ import { prisma } from "../lib/prisma";
 import { AppError } from "../middleware/errorHandler";
 import { toDecimal } from "../lib/decimal";
 import { STANDARD_UNITS, standardShortName } from "../lib/units";
+import { adjustStock } from "../services/stock/stockService";
+import { writeAudit } from "../services/audit/audit";
+import { fieldErrorsFrom } from "../lib/viewHelpers";
 
 // Blank form inputs arrive as "" — treat them as "not provided" instead of coercing to 0.
 const blankToUndefined = (v: unknown) => (v === "" || v === null ? undefined : v);
@@ -38,14 +41,14 @@ const productSchema = z.object({
 }).superRefine((data, ctx) => {
   if (data.secondaryUnitName) {
     if (data.secondaryUnitName === data.unitName) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Secondary unit must be different from the base unit" });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["secondaryUnitName"], message: "Secondary unit must be different from the base unit" });
     }
     if (data.conversionRate === undefined) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Conversion rate is required when a secondary unit is selected" });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["conversionRate"], message: "Conversion rate is required when a secondary unit is selected" });
     }
   }
   if (data.wholesalePrice !== undefined && data.minWholesaleQty === undefined) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Minimum wholesale quantity is required when a wholesale price is set" });
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["minWholesaleQty"], message: "Minimum wholesale quantity is required when a wholesale price is set" });
   }
 });
 
@@ -68,7 +71,7 @@ async function findOrCreateUnit(businessId: string, name: string) {
   });
 }
 
-async function loadFormOptions(businessId: string) {
+export async function loadFormOptions(businessId: string) {
   const [categories, units, taxes] = await Promise.all([
     prisma.category.findMany({ where: { businessId }, orderBy: { name: "asc" } }),
     prisma.unit.findMany({ where: { businessId }, orderBy: { name: "asc" } }),
@@ -120,6 +123,13 @@ async function buildProductData(businessId: string, data: ProductInput, imagePat
 
 function uploadedImagePath(req: Request) {
   return req.file ? `/uploads/items/${req.file.filename}` : undefined;
+}
+
+/** Re-renders the item form with what the user typed and the errors beside their fields. */
+async function renderProductFormError(res: Response, title: string, product: Record<string, unknown>, errors: string[], fieldErrors: Record<string, string> = {}) {
+  const options = await loadFormOptions(res.locals.business.id);
+  res.locals.fieldErrors = fieldErrors;
+  return res.status(422).render("products/form", { title, activeNav: "products", product, errors, fieldErrors, stockTransactions: [], ...options });
 }
 
 export async function listProducts(req: Request, res: Response) {
@@ -204,14 +214,7 @@ export async function createProduct(req: Request, res: Response) {
   const parsed = productSchema.safeParse(req.body);
 
   if (!parsed.success) {
-    const options = await loadFormOptions(business.id);
-    return res.status(422).render("products/form", {
-      title: "Add Item",
-      activeNav: "products",
-      product: req.body,
-      errors: parsed.error.errors.map((e) => e.message),
-      ...options,
-    });
+    return renderProductFormError(res, "Add Item", req.body, parsed.error.errors.map((e) => e.message), fieldErrorsFrom(parsed.error));
   }
 
   const data = parsed.data;
@@ -220,14 +223,7 @@ export async function createProduct(req: Request, res: Response) {
     where: { businessId: business.id, name: { equals: data.name, mode: "insensitive" }, isActive: true }
   });
   if (duplicate) {
-    const options = await loadFormOptions(business.id);
-    return res.status(422).render("products/form", {
-      title: "Add Item",
-      activeNav: "products",
-      product: req.body,
-      errors: ["An item with this name already exists."],
-      ...options,
-    });
+    return renderProductFormError(res, "Add Item", req.body, ["An item with this name already exists."], { name: "An item with this name already exists." });
   }
 
   const productData = await buildProductData(business.id, data, uploadedImagePath(req));
@@ -240,8 +236,8 @@ export async function createProduct(req: Request, res: Response) {
     },
   });
 
-  req.session.flash = { type: "success", message: "Item saved successfully." };
-  res.redirect("/products");
+  req.session.flash = { type: "success", message: `Item "${data.name}" saved.` };
+  res.redirect(req.body.after === "new" ? "/products/new" : "/products");
 }
 
 export async function updateProduct(req: Request, res: Response) {
@@ -251,14 +247,7 @@ export async function updateProduct(req: Request, res: Response) {
 
   const parsed = productSchema.safeParse(req.body);
   if (!parsed.success) {
-    const options = await loadFormOptions(business.id);
-    return res.status(422).render("products/form", {
-      title: "Edit Item",
-      activeNav: "products",
-      product: { ...existing, ...req.body },
-      errors: parsed.error.errors.map((e) => e.message),
-      ...options,
-    });
+    return renderProductFormError(res, "Edit Item", { ...existing, ...req.body }, parsed.error.errors.map((e) => e.message), fieldErrorsFrom(parsed.error));
   }
 
   const data = parsed.data;
@@ -272,14 +261,7 @@ export async function updateProduct(req: Request, res: Response) {
     }
   });
   if (duplicate) {
-    const options = await loadFormOptions(business.id);
-    return res.status(422).render("products/form", {
-      title: "Edit Item",
-      activeNav: "products",
-      product: { ...existing, ...req.body },
-      errors: ["An item with this name already exists."],
-      ...options,
-    });
+    return renderProductFormError(res, "Edit Item", { ...existing, ...req.body }, ["An item with this name already exists."], { name: "An item with this name already exists." });
   }
 
   const productData = await buildProductData(business.id, data, uploadedImagePath(req));
@@ -291,11 +273,12 @@ export async function updateProduct(req: Request, res: Response) {
     where: { id: existing.id },
     data: {
       ...productData,
+      ...(req.body.removeImage === "1" && !req.file ? { imagePath: null } : {}),
       currentStock: toDecimal(existing.currentStock).plus(stockDelta).toNumber(),
     },
   });
 
-  req.session.flash = { type: "success", message: "Item updated successfully." };
+  req.session.flash = { type: "success", message: `Item "${data.name}" updated.` };
   res.redirect("/products");
 }
 
@@ -307,4 +290,75 @@ export async function deleteProduct(req: Request, res: Response) {
   await prisma.product.update({ where: { id: product.id }, data: { isActive: false } });
   req.session.flash = { type: "success", message: "Item removed." };
   res.redirect("/products");
+}
+
+const adjustmentSchema = z.object({
+  direction: z.enum(["ADD", "REDUCE"]),
+  quantity: z.coerce.number().positive("Quantity must be more than 0"),
+  reason: z.string().trim().min(1, "A reason is required").max(200),
+  date: z.preprocess(blankToUndefined, z.coerce.date().optional()),
+});
+
+/** Manual stock correction (damage, recount, etc.) recorded as an ADJUSTMENT movement with its reason. */
+export async function adjustProductStock(req: Request, res: Response) {
+  const business = res.locals.business;
+  const product = await prisma.product.findFirst({ where: { id: req.params.id, businessId: business.id } });
+  if (!product) throw new AppError("Item not found", 404);
+  if (product.isService) throw new AppError("Services do not have stock", 400);
+
+  const parsed = adjustmentSchema.safeParse(req.body);
+  if (!parsed.success) {
+    req.session.flash = { type: "danger", message: parsed.error.errors.map((e) => e.message).join("; ") };
+    return res.redirect(`/products/${product.id}/edit`);
+  }
+  const qty = toDecimal(parsed.data.quantity).times(parsed.data.direction === "REDUCE" ? -1 : 1);
+  try {
+    await prisma.$transaction(async (tx) => {
+      await adjustStock(tx, product.id, qty, parsed.data.reason, parsed.data.date ?? new Date(), business.settings?.negativeStockPolicy ?? "ALLOW_WITH_WARNING");
+      await writeAudit(tx, { businessId: business.id, userId: req.session.userId, entity: "PRODUCT", entityId: product.id, action: "STOCK_ADJUSTMENT", detail: { quantity: qty.toString(), reason: parsed.data.reason } });
+    });
+    req.session.flash = { type: "success", message: `Stock ${parsed.data.direction === "ADD" ? "added" : "reduced"} by ${parsed.data.quantity}.` };
+  } catch (err) {
+    if (!(err instanceof AppError) || err.status >= 500) throw err;
+    req.session.flash = { type: "danger", message: err.message };
+  }
+  res.redirect(`/products/${product.id}/edit`);
+}
+
+/**
+ * Quick-create from the invoice/purchase form's "New item" dialog (JSON). Uses the same validation
+ * and defaults as the full item form, so the item is identical to one added on the Items page.
+ */
+export async function quickCreateProduct(req: Request, res: Response) {
+  const business = res.locals.business;
+  const parsed = productSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(422).json({ errors: parsed.error.errors.map((e) => e.message), fieldErrors: fieldErrorsFrom(parsed.error) });
+  }
+  const data = parsed.data;
+  const duplicate = await prisma.product.findFirst({ where: { businessId: business.id, name: { equals: data.name, mode: "insensitive" }, isActive: true } });
+  if (duplicate) return res.status(422).json({ errors: ["An item with this name already exists."], fieldErrors: { name: "An item with this name already exists." } });
+
+  const product = await prisma.product.create({
+    data: { businessId: business.id, ...(await buildProductData(business.id, data, undefined)), currentStock: data.openingStock },
+    include: { unit: true, tax: true },
+  });
+  res.status(201).json({
+    product: {
+      id: product.id,
+      name: product.name,
+      itemCode: product.itemCode,
+      hsnCode: product.hsnCode,
+      unitName: product.unit?.name || "",
+      salePrice: product.salePrice,
+      priceType: product.priceType,
+      purchasePrice: product.purchasePrice,
+      purchasePriceType: product.purchasePriceType,
+      gstRate: product.tax ? Number(product.tax.rate) : 0,
+      defaultDiscount: product.defaultDiscount,
+      defaultDiscountType: product.defaultDiscountType,
+      currentStock: product.currentStock,
+      isService: product.isService,
+    },
+  });
 }

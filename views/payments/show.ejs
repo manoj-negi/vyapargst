@@ -1,0 +1,36 @@
+<%- include('../partials/layout-start', { title: title, activeNav: activeNav }) %>
+<% var cancelled = voucher.status === 'CANCELLED'; %>
+<div class="page page-narrow">
+  <%- include('../partials/page-header', {
+    title: title,
+    badge: cancelled ? '<span class="status-badge status-cancelled">Cancelled</span>' : '<span class="status-badge ' + (voucher.direction === 'IN' ? 'status-paid' : 'status-unpaid') + '">' + (voucher.direction === 'IN' ? 'Received' : 'Paid') + '</span>',
+    subtitle: (voucher.party ? voucher.party.name + ' · ' : '') + fdate(voucher.date) + ' · ' + inr(voucher.amount),
+    back: { href: '/payments?direction=' + voucher.direction, label: 'Payments', key: '/payments' },
+    actions: cancelled ? null : '<form method="POST" action="/payments/' + voucher.id + '/cancel" class="m-0" data-confirm="The payment stays on record as cancelled, and the bills it settled become unpaid again by these amounts." data-confirm-title="Cancel ' + voucher.voucherNo + '?" data-confirm-label="Cancel payment" data-confirm-cancel="Keep payment" data-confirm-busy="Cancelling…" data-confirm-reason="reason" data-confirm-reason-placeholder="e.g. Recorded against the wrong party"><button class="btn btn-outline-danger"><i class="icon-ban"></i> Cancel payment</button></form>'
+  }) %>
+  <% if (cancelled) { %><div class="alert alert-secondary"><strong>Cancelled</strong> <%= voucher.cancelledAt ? 'on ' + fdate(voucher.cancelledAt) : '' %><%= voucher.cancelReason ? ' — ' + voucher.cancelReason : '' %>.</div><% } %>
+  <div class="panel">
+    <div class="panel-body">
+      <dl class="dl-grid">
+        <dt>Party</dt><dd><% if (voucher.party) { %><a href="/customers/<%= voucher.party.id %>"><%= voucher.party.name %></a><% } else { %>—<% } %></dd>
+        <dt>Date</dt><dd><%= fdate(voucher.date) %></dd>
+        <dt>Amount</dt><dd class="fw-semibold num"><%= inr(voucher.amount) %></dd>
+        <dt>Mode</dt><dd><%= modeLabel(voucher.mode) %></dd>
+        <% if (voucher.reference) { %><dt>Reference</dt><dd><%= voucher.reference %></dd><% } %>
+        <% if (voucher.note) { %><dt>Note</dt><dd><%= voucher.note %></dd><% } %>
+      </dl>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-header"><h2 class="panel-title">Settled against</h2></div>
+    <table class="table table-app">
+      <thead><tr><th>Document</th><th class="num" style="width:160px">Amount</th></tr></thead>
+      <tbody>
+        <% allocations.forEach(function(a) { %><tr><td><a href="<%= a.basePath %>/<%= a.document.id %>" class="cell-main"><%= a.document.invoiceNo %></a> <span class="cell-sub"><%= a.label %></span></td><td class="num"><%= inr(a.amount) %></td></tr><% }) %>
+        <% if (unallocated > 0.004) { %><tr><td>Advance on party account</td><td class="num"><%= inr(unallocated) %></td></tr><% } %>
+        <% if (!allocations.length && unallocated <= 0.004) { %><tr><td colspan="2" class="muted">Nothing allocated.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<%- include('../partials/layout-end') %>

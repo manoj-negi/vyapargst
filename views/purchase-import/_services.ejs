@@ -1,0 +1,24 @@
+<%# Status of the local reading services (purchase import). services = localStatus() %>
+<% var s = services; var o = s.ollama; %>
+<details class="panel import-services <%= o.ok && s.tesseract.ok ? '' : 'attention' %>" <%= o.ok && s.tesseract.ok ? '' : 'open' %>>
+  <summary class="panel-body">
+    <strong>Bill reading on this Mac</strong>
+    <span class="svc <%= s.tesseract.ok ? 'ok' : 'bad' %>">OCR <%= s.tesseract.ok ? '✓' : '✗' %></span>
+    <span class="svc <%= o.ok ? 'ok' : 'off' %>">Local AI <%= o.ok ? '✓' : 'off' %></span>
+    <span class="small text-muted">Free and offline: bills stay on this computer<%= s.provider === 'anthropic' ? ' (Claude API also enabled)' : '' %>.</span>
+  </summary>
+  <div class="panel-body pt-0 small">
+    <ul class="svc-list">
+      <li><span class="svc ok">✓</span> <strong>Text PDFs, Excel, CSV, Word, ODT, PowerPoint, RTF, TXT</strong> are read directly — no OCR or AI needed.</li>
+      <li><span class="svc <%= s.tesseract.ok ? 'ok' : 'bad' %>"><%= s.tesseract.ok ? '✓' : '✗' %></span> <strong>Scanned PDFs and photos</strong>: Tesseract OCR <%= s.tesseract.ok ? s.tesseract.version + ' (' + s.tesseract.languages.filter(function (l) { return l !== 'osd'; }).join(', ') + ')' : 'is not installed — run: brew install tesseract' %><%= s.pdftoppm.ok ? '' : ' · scanned PDFs also need: brew install poppler' %></li>
+      <li><span class="svc <%= o.ok ? 'ok' : 'off' %>"><%= o.ok ? '✓' : '–' %></span> <strong>Local AI for unusual layouts</strong> (optional, Ollama): <%= o.ok ? o.model + ' ready (Ollama ' + o.version + ')' : o.problem %></li>
+    </ul>
+    <% if (!o.ok) { %>
+    <div class="mt-2">To turn on the optional local AI (about 1.5 GB download; about 2 GB of memory while loaded; about 2–3 minutes per bill on an 8 GB M1, and it can misplace numbers, so every line still needs checking):</div>
+    <pre class="mb-0">brew install ollama
+brew services start ollama        # keeps it running, also after restarts
+ollama pull <%= o.model %></pre>
+    <% } %>
+    <div class="mt-2 text-muted">Keep running: this app (and its database). Ollama only if you want the AI fallback; everything else works with it stopped. From the phone app, bills are uploaded to and read on this computer, so it must be on and reachable.</div>
+  </div>
+</details>

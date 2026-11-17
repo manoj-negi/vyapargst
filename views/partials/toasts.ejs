@@ -1,10 +1,14 @@
-<div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer" style="z-index: 1080">
-  <% if (typeof flash !== 'undefined' && flash && flash.message) { %>
-    <div class="toast align-items-center text-bg-<%= flash.type || 'success' %> border-0 show" role="alert" data-autohide-toast>
+<%# Routine success/info messages appear as a toast; errors that need the user's attention open a dialog (public/js/app.js). %>
+<div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer" style="z-index: 1080" aria-live="polite" aria-atomic="true">
+  <% if (typeof flash !== 'undefined' && flash && flash.message && flash.type !== 'danger') { %>
+    <div class="toast align-items-center text-bg-<%= flash.type === 'info' ? 'primary' : (flash.type || 'success') %> border-0 show" role="status" data-autohide-toast>
       <div class="d-flex">
-        <div class="toast-body"><%= flash.message %></div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        <div class="toast-body"><i class="<%= flash.type === 'info' ? 'icon-info' : 'icon-circle-check' %> me-1"></i> <%= flash.message %></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
       </div>
     </div>
   <% } %>
 </div>
+<% if (typeof flash !== 'undefined' && flash && flash.message && flash.type === 'danger') { %>
+  <div hidden data-flash-error data-message="<%= flash.message %>"></div>
+<% } %>

@@ -1,60 +1,114 @@
-<%# Shared by the Add/Edit Customer page and the New Customer popup on the Sale Invoice form. %>
-<div class="row g-3">
-  <div class="col-md-6">
-    <label class="form-label small fw-semibold">Customer Name *</label>
-    <input type="text" name="name" class="form-control" required value="<%= customer ? customer.name || '' : '' %>">
+<%#
+  Party fields, shared by the Add/Edit Party page and the quick "New customer/supplier" dialog on
+  invoice and purchase forms (quick: true shows contact, GST and address only).
+%>
+<%
+  var c = customer || {};
+  var isQuick = typeof quick !== 'undefined' && quick;
+  var fe = typeof fieldErrors !== 'undefined' && fieldErrors ? fieldErrors : {};
+  var ob = c.openingBalance !== undefined && c.openingBalance !== null ? Number(c.openingBalance) : 0;
+  if (c.openingBalanceAmount !== undefined) ob = Number(c.openingBalanceAmount || 0) * (c.openingBalanceSide === 'PAY' ? -1 : 1);
+  var idp = isQuick ? 'q-' : 'pf-';
+  function v(f) { return c[f] != null ? c[f] : ''; }
+  var stateValue = c.state || (typeof defaultState !== 'undefined' ? defaultState : '');
+%>
+<% if (!isQuick) { %><div class="form-section"><div class="form-section-head"><h2 class="form-section-title">Party details</h2></div><% } %>
+<div class="fgrid">
+  <div class="<%= isQuick ? 's8' : 's6' %>">
+    <label class="form-label" for="<%= idp %>name">Name <span class="req">*</span></label>
+    <input type="text" id="<%= idp %>name" name="name" class="form-control<%= invalid(fe, 'name') %>" required maxlength="150" value="<%= v('name') %>" <%= isQuick ? '' : 'autofocus' %>>
+    <%- fieldError(fe, 'name') %>
   </div>
-  <div class="col-md-6">
-    <label class="form-label small fw-semibold">Customer Type</label>
-    <select name="customerType" class="form-select">
-      <option value="CONSUMER" <%= (!customer || customer.customerType === 'CONSUMER') ? 'selected' : '' %>>Consumer</option>
-      <option value="REGISTERED" <%= (customer && customer.customerType === 'REGISTERED') ? 'selected' : '' %>>Registered</option>
-      <option value="UNREGISTERED" <%= (customer && customer.customerType === 'UNREGISTERED') ? 'selected' : '' %>>Unregistered</option>
+  <% if (!isQuick) { %>
+  <div class="s3">
+    <label class="form-label" for="<%= idp %>partyType">Party type</label>
+    <select id="<%= idp %>partyType" name="partyType" class="form-select">
+      <option value="CUSTOMER" <%= (!c.partyType || c.partyType === 'CUSTOMER') ? 'selected' : '' %>>Customer</option>
+      <option value="SUPPLIER" <%= c.partyType === 'SUPPLIER' ? 'selected' : '' %>>Supplier</option>
+      <option value="BOTH" <%= c.partyType === 'BOTH' ? 'selected' : '' %>>Customer &amp; supplier</option>
     </select>
   </div>
-  <div class="col-md-6">
-    <label class="form-label small fw-semibold">Department</label>
-    <input type="text" name="department" class="form-control" value="<%= customer ? customer.department || '' : '' %>">
-  </div>
-  <div class="col-md-6">
-    <label class="form-label small fw-semibold">Section</label>
-    <input type="text" name="section" class="form-control" value="<%= customer ? customer.section || '' : '' %>">
-  </div>
-  <div class="col-md-6">
-    <label class="form-label small fw-semibold">Phone</label>
-    <input type="text" name="phone" class="form-control" placeholder="9876543210" value="<%= customer ? customer.phone || '' : '' %>">
-  </div>
-  <div class="col-md-6">
-    <label class="form-label small fw-semibold">Email</label>
-    <input type="email" name="email" class="form-control" value="<%= customer ? customer.email || '' : '' %>">
-  </div>
-  <div class="col-md-6">
-    <label class="form-label small fw-semibold">GSTIN</label>
-    <input type="text" name="gstin" class="form-control text-uppercase" maxlength="15" value="<%= customer ? customer.gstin || '' : '' %>">
-  </div>
-  <div class="col-md-6">
-    <label class="form-label small fw-semibold">PAN</label>
-    <input type="text" name="pan" class="form-control text-uppercase" maxlength="10" value="<%= customer ? customer.pan || '' : '' %>">
-  </div>
-  <div class="col-12">
-    <label class="form-label small fw-semibold">Billing Address</label>
-    <textarea name="billingAddress" class="form-control" rows="2"><%= customer ? customer.billingAddress || '' : '' %></textarea>
-  </div>
-  <div class="col-12">
-    <label class="form-label small fw-semibold">Shipping Address</label>
-    <textarea name="shippingAddress" class="form-control" rows="2"><%= customer ? customer.shippingAddress || '' : '' %></textarea>
-  </div>
-  <div class="col-md-6">
-    <label class="form-label small fw-semibold">State *</label>
-    <select name="state" class="form-select" required>
-      <option value="">Select state</option>
-      <% states.forEach(function(s) { %>
-        <option value="<%= s %>" <%= (customer ? customer.state === s : defaultState === s) ? 'selected' : '' %>><%= s %></option>
-      <% }) %>
+  <% } %>
+  <div class="<%= isQuick ? 's4' : 's3' %>">
+    <label class="form-label" for="<%= idp %>customerType">GST type</label>
+    <select id="<%= idp %>customerType" name="customerType" class="form-select">
+      <option value="CONSUMER" <%= (!c.customerType || c.customerType === 'CONSUMER') ? 'selected' : '' %>>Consumer</option>
+      <option value="REGISTERED" <%= c.customerType === 'REGISTERED' ? 'selected' : '' %>>Registered</option>
+      <option value="UNREGISTERED" <%= c.customerType === 'UNREGISTERED' ? 'selected' : '' %>>Unregistered</option>
     </select>
   </div>
-  <div class="col-md-6">
-    <label class="form-label small fw-semibold">Pincode</label>
-    <input type="text" name="pincode" class="form-control" maxlength="6" value="<%= customer ? customer.pincode || '' : '' %>">
+  <div class="s4">
+    <label class="form-label" for="<%= idp %>phone">Phone</label>
+    <input type="tel" id="<%= idp %>phone" name="phone" class="form-control<%= invalid(fe, 'phone') %>" placeholder="9876543210" maxlength="15" inputmode="tel" value="<%= v('phone') %>">
+    <%- fieldError(fe, 'phone') %>
+  </div>
+  <div class="s4">
+    <label class="form-label" for="<%= idp %>email">Email</label>
+    <input type="email" id="<%= idp %>email" name="email" class="form-control<%= invalid(fe, 'email') %>" maxlength="120" value="<%= v('email') %>">
+    <%- fieldError(fe, 'email') %>
+  </div>
+  <div class="s4">
+    <label class="form-label" for="<%= idp %>gstin">GSTIN</label>
+    <input type="text" id="<%= idp %>gstin" name="gstin" class="form-control text-uppercase<%= invalid(fe, 'gstin') %>" maxlength="15" placeholder="05ABCDE1234F1Z5" value="<%= v('gstin') %>">
+    <%- fieldError(fe, 'gstin') %>
+  </div>
+  <div class="s3">
+    <label class="form-label" for="<%= idp %>pan">PAN</label>
+    <input type="text" id="<%= idp %>pan" name="pan" class="form-control text-uppercase<%= invalid(fe, 'pan') %>" maxlength="10" value="<%= v('pan') %>">
+    <%- fieldError(fe, 'pan') %>
+  </div>
+  <div class="s3">
+    <label class="form-label" for="<%= idp %>department">Department</label>
+    <input type="text" id="<%= idp %>department" name="department" class="form-control" maxlength="80" value="<%= v('department') %>">
+  </div>
+  <div class="s3">
+    <label class="form-label" for="<%= idp %>section">Section</label>
+    <input type="text" id="<%= idp %>section" name="section" class="form-control" maxlength="80" value="<%= v('section') %>">
   </div>
 </div>
+<% if (!isQuick) { %></div><div class="form-section"><div class="form-section-head"><h2 class="form-section-title">Address</h2><div class="form-section-desc">The state decides CGST + SGST (same state) or IGST (other state).</div></div><% } else { %><div class="fgrid mt-3"><% } %>
+<% if (!isQuick) { %><div class="fgrid"><% } %>
+  <div class="s6">
+    <label class="form-label" for="<%= idp %>billingAddress">Billing address</label>
+    <textarea id="<%= idp %>billingAddress" name="billingAddress" class="form-control" rows="2" maxlength="500"><%= v('billingAddress') %></textarea>
+  </div>
+  <div class="s6">
+    <label class="form-label" for="<%= idp %>shippingAddress">Shipping address <span class="text-muted fw-normal">(if different)</span></label>
+    <textarea id="<%= idp %>shippingAddress" name="shippingAddress" class="form-control" rows="2" maxlength="500"><%= v('shippingAddress') %></textarea>
+  </div>
+  <div class="s4">
+    <label class="form-label" for="<%= idp %>state">State <span class="req">*</span></label>
+    <select id="<%= idp %>state" name="state" class="form-select<%= invalid(fe, 'state') %>" required>
+      <option value="">Select state</option>
+      <% states.forEach(function(s) { %><option value="<%= s %>" <%= stateValue === s ? 'selected' : '' %>><%= s %></option><% }) %>
+    </select>
+    <%- fieldError(fe, 'state') %>
+  </div>
+  <div class="s2">
+    <label class="form-label" for="<%= idp %>pincode">PIN code</label>
+    <input type="text" id="<%= idp %>pincode" name="pincode" class="form-control" maxlength="6" inputmode="numeric" value="<%= v('pincode') %>">
+  </div>
+</div>
+<% if (!isQuick) { %></div>
+<div class="form-section">
+  <div class="form-section-head"><h2 class="form-section-title">Opening balance</h2><div class="form-section-desc">What was owed on the day you started using the app.</div></div>
+  <div class="fgrid">
+    <div class="s3">
+      <label class="form-label" for="pf-ob">Amount</label>
+      <div class="price-pair"><span class="rupee">₹</span><input type="number" id="pf-ob" name="openingBalanceAmount" class="form-control<%= invalid(fe, 'openingBalanceAmount') %>" min="0" step="0.01" value="<%= Math.abs(ob) %>"></div>
+      <%- fieldError(fe, 'openingBalanceAmount') %>
+    </div>
+    <div class="s4">
+      <label class="form-label" for="pf-obside">Balance is</label>
+      <select id="pf-obside" name="openingBalanceSide" class="form-select">
+        <option value="RECEIVE" <%= ob >= 0 ? 'selected' : '' %>>To receive (party owes you)</option>
+        <option value="PAY" <%= ob < 0 ? 'selected' : '' %>>To pay (you owe party)</option>
+      </select>
+    </div>
+    <div class="s3">
+      <label class="form-label" for="pf-obdate">As of date</label>
+      <input type="date" id="pf-obdate" name="openingBalanceDate" class="form-control" value="<%= c.openingBalanceDate ? new Date(c.openingBalanceDate).toISOString().slice(0,10) : '' %>">
+    </div>
+  </div>
+</div>
+<% } %>

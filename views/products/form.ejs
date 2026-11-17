@@ -1,217 +1,299 @@
 <%- include('../partials/layout-start', { title: product && product.id ? 'Edit Item' : 'Add Item', activeNav: 'products' }) %>
 <%
   // product is either a saved record (with relations) or the raw request body after a validation error
+  var isEdit = !!(product && product.id);
+  var fe = fieldErrors || {};
   function val(field) { return product && product[field] != null ? product[field] : ''; }
+  function num(field, fallback) { var v = val(field); return v === '' ? fallback : Number(v); }
+  var isService = product ? (product.isService === true || product.itemType === 'SERVICE') : false;
   var baseUnitName = product ? (product.unitName || (product.unit ? product.unit.name : '')) : '';
   var secondaryUnitName = product ? (product.secondaryUnitName || (product.secondaryUnit ? product.secondaryUnit.name : '')) : '';
+  var categoryName = product ? (product.categoryName != null ? product.categoryName : (product.category ? product.category.name : '')) : '';
   var openingStockDate = product && product.openingStockDate ? new Date(product.openingStockDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+  var hasExtras = !!(val('imagePath') || num('defaultDiscount', 0) > 0 || fe.defaultDiscount);
   function priceTypeOptions(selected) {
     return '<option value="INCLUSIVE"' + (selected !== 'EXCLUSIVE' ? ' selected' : '') + '>With Tax</option>' +
            '<option value="EXCLUSIVE"' + (selected === 'EXCLUSIVE' ? ' selected' : '') + '>Without Tax</option>';
   }
+  var movementLabels = { OPENING: 'Opening', SALE: 'Sale', PURCHASE: 'Purchase', ADJUSTMENT: 'Adjustment', SALE_RETURN: 'Sale return', PURCHASE_RETURN: 'Purchase return', REVERSAL: 'Reversal' };
 %>
 
-<div class="row g-4">
-  <div class="<%= product && product.id ? 'col-lg-8' : 'col-12' %>">
-    <div class="card p-4">
-      <h5 class="fw-bold mb-3"><%= product && product.id ? 'Edit Item' : 'Add Item' %></h5>
+<div class="page <%= isEdit ? 'page-medium' : 'page-narrow' %>">
+  <%- include('../partials/page-header', {
+    title: isEdit ? (product.name || 'Edit Item') : 'Add Item',
+    subtitle: isEdit ? 'Changes apply to new documents only. Existing invoices keep the price and tax they were issued with.' : 'Items appear in invoice and purchase search as soon as they are saved.',
+    back: { href: '/products', label: 'Items', key: '/products' },
+    badge: isEdit ? '<span class="status-badge status-neutral">' + (isService ? 'Service' : 'Product') + '</span>' : null,
+    actions: null
+  }) %>
 
-      <% if (errors && errors.length) { %>
-        <div class="alert alert-danger py-2 small">
-          <ul class="mb-0 ps-3"><% errors.forEach(function(e) { %><li><%= e %></li><% }) %></ul>
+  <div class="<%= isEdit ? 'd-grid gap-3 item-edit-grid' : '' %>">
+  <div>
+  <%- include('../partials/form-errors', { errors: errors }) %>
+
+  <form method="POST" enctype="multipart/form-data" action="<%= isEdit ? '/products/' + product.id : '/products' %>" id="itemForm" data-dirty-guard novalidate>
+    <div class="panel">
+      <section class="form-section" aria-labelledby="secBasic">
+        <div class="form-section-head d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <div>
+            <h2 class="form-section-title" id="secBasic">Basic details</h2>
+            <div class="form-section-desc">Name and codes used to find the item while billing.</div>
+          </div>
+          <div class="segmented" role="radiogroup" aria-label="Item type">
+            <input type="radio" class="btn-check" name="itemType" id="typeProduct" value="PRODUCT" <%= !isService ? 'checked' : '' %>>
+            <label for="typeProduct"><i class="icon-package"></i> Product</label>
+            <input type="radio" class="btn-check" name="itemType" id="typeService" value="SERVICE" <%= isService ? 'checked' : '' %>>
+            <label for="typeService"><i class="icon-wrench"></i> Service</label>
+          </div>
         </div>
-      <% } %>
-
-      <form method="POST" enctype="multipart/form-data" action="<%= product && product.id ? '/products/' + product.id : '/products' %>">
-        <div class="btn-group mb-3" role="group">
-          <input type="radio" class="btn-check" name="itemType" id="typeProduct" value="PRODUCT" <%= (!product || !product.isService) ? 'checked' : '' %>>
-          <label class="btn btn-outline-primary btn-sm" for="typeProduct">Product</label>
-          <input type="radio" class="btn-check" name="itemType" id="typeService" value="SERVICE" <%= (product && product.isService) ? 'checked' : '' %>>
-          <label class="btn btn-outline-primary btn-sm" for="typeService">Service</label>
+        <div class="fgrid">
+          <div class="s8">
+            <label class="form-label" for="itemName">Item name <span class="req">*</span></label>
+            <input type="text" id="itemName" name="name" class="form-control<%= invalid(fe, 'name') %>" required maxlength="200" autocomplete="off" value="<%= val('name') %>" <%= isEdit ? '' : 'autofocus' %>>
+            <%- fieldError(fe, 'name') %>
+          </div>
+          <div class="s4">
+            <label class="form-label" for="categoryName">Category</label>
+            <input type="text" id="categoryName" name="categoryName" class="form-control" list="categoryList" maxlength="60" value="<%= categoryName %>" placeholder="Type or pick">
+            <datalist id="categoryList"><% categories.forEach(function(c) { %><option value="<%= c.name %>"><% }) %></datalist>
+          </div>
+          <div class="s3">
+            <label class="form-label" for="itemCode">Item code / SKU</label>
+            <input type="text" id="itemCode" name="itemCode" class="form-control" maxlength="40" value="<%= val('itemCode') %>">
+          </div>
+          <div class="s3">
+            <label class="form-label" for="barcode">Barcode</label>
+            <input type="text" id="barcode" name="barcode" class="form-control" maxlength="40" inputmode="numeric" value="<%= val('barcode') %>">
+          </div>
+          <div class="s3">
+            <label class="form-label" for="hsnCode"><span class="label-goods">HSN code</span><span class="label-service d-none">SAC code</span></label>
+            <input type="text" id="hsnCode" name="hsnCode" class="form-control" maxlength="8" inputmode="numeric" value="<%= val('hsnCode') %>">
+          </div>
+          <div class="s12"><div id="hsnSuggestions" class="hsn-suggestions" aria-live="polite"></div></div>
         </div>
+      </section>
 
-        <div class="row g-3">
-          <div class="col-12">
-            <label class="form-label small fw-semibold">Item Name *</label>
-            <input type="text" id="itemName" name="name" class="form-control" required value="<%= product ? product.name || '' : '' %>">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label small fw-semibold">Item Code</label>
-            <input type="text" name="itemCode" class="form-control" value="<%= product ? product.itemCode || '' : '' %>">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label small fw-semibold">Barcode</label>
-            <input type="text" name="barcode" class="form-control" value="<%= product ? product.barcode || '' : '' %>">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label small fw-semibold">HSN Code</label>
-            <input type="text" id="hsnCode" name="hsnCode" class="form-control" value="<%= product ? product.hsnCode || '' : '' %>">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">Category</label>
-            <input type="text" name="categoryName" class="form-control" list="categoryList" value="<%= product && product.category ? product.category.name : '' %>">
-            <datalist id="categoryList">
-              <% categories.forEach(function(c) { %><option value="<%= c.name %>"><% }) %>
-            </datalist>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">Item Image</label>
-            <% if (product && product.imagePath) { %>
-              <div class="mb-2"><img src="<%= product.imagePath %>" alt="Item image" style="max-height: 64px;" class="rounded border"></div>
-            <% } %>
-            <input type="file" name="image" class="form-control" accept="image/png,image/jpeg,image/webp">
-          </div>
-
-          <div id="hsnSuggestions" class="col-12"></div>
+      <section class="form-section" aria-labelledby="secUnits">
+        <div class="form-section-head">
+          <h2 class="form-section-title" id="secUnits">Units</h2>
+          <div class="form-section-desc">Add a secondary unit if you also sell in packs, boxes or dozens.</div>
         </div>
-
-        <div class="form-section-title">Unit</div>
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">Base Unit *</label>
-            <select id="baseUnit" name="unitName" class="form-select" required>
+        <div class="fgrid">
+          <div class="s4">
+            <label class="form-label" for="baseUnit">Base unit <span class="req">*</span></label>
+            <select id="baseUnit" name="unitName" class="form-select<%= invalid(fe, 'unitName') %>" required>
               <option value="" <%= baseUnitName ? '' : 'selected' %> disabled>Select unit</option>
               <% units.forEach(function(u) { %>
                 <option value="<%= u.name %>" <%= u.name === baseUnitName ? 'selected' : '' %>><%= u.name %> (<%= u.shortName %>)</option>
               <% }) %>
             </select>
+            <%- fieldError(fe, 'unitName') %>
           </div>
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">Secondary Unit</label>
-            <select id="secondaryUnit" name="secondaryUnitName" class="form-select">
+          <div class="s4">
+            <label class="form-label" for="secondaryUnit">Secondary unit</label>
+            <select id="secondaryUnit" name="secondaryUnitName" class="form-select<%= invalid(fe, 'secondaryUnitName') %>">
               <option value="">None</option>
               <% units.forEach(function(u) { %>
                 <option value="<%= u.name %>" <%= u.name === secondaryUnitName ? 'selected' : '' %>><%= u.name %> (<%= u.shortName %>)</option>
               <% }) %>
             </select>
+            <%- fieldError(fe, 'secondaryUnitName') %>
           </div>
-          <div class="col-12" id="conversionRow" <%= secondaryUnitName ? '' : 'hidden' %>>
-            <label class="form-label small fw-semibold">Conversion Rate</label>
-            <div class="input-group" style="max-width: 420px;">
-              <span class="input-group-text">1 <span class="ms-1" data-unit-label="base"><%= baseUnitName %></span> =</span>
-              <input type="number" name="conversionRate" class="form-control" step="0.0001" min="0" value="<%= val('conversionRate') %>">
+          <div class="s4" id="conversionRow" <%= secondaryUnitName ? '' : 'hidden' %>>
+            <label class="form-label" for="conversionRate">Conversion</label>
+            <div class="input-group">
+              <span class="input-group-text">1 <span class="ms-1" data-unit-label="base"><%= baseUnitName %></span>&nbsp;=</span>
+              <input type="number" id="conversionRate" name="conversionRate" class="form-control text-end<%= invalid(fe, 'conversionRate') %>" step="0.0001" min="0" value="<%= val('conversionRate') %>">
               <span class="input-group-text" data-unit-label="secondary"><%= secondaryUnitName %></span>
             </div>
+            <%- fieldError(fe, 'conversionRate') %>
           </div>
         </div>
+      </section>
 
-        <div class="form-section-title">Pricing</div>
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">Sale Price *</label>
-            <div class="input-group">
-              <input type="number" name="salePrice" class="form-control" step="0.01" min="0" required value="<%= product ? product.salePrice || '' : '' %>">
-              <select name="priceType" class="form-select" style="max-width: 140px;"><%- priceTypeOptions(product && product.priceType) %></select>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">Purchase Price</label>
-            <div class="input-group">
-              <input type="number" name="purchasePrice" class="form-control" step="0.01" min="0" value="<%= product ? product.purchasePrice || '' : '' %>">
-              <select name="purchasePriceType" class="form-select" style="max-width: 140px;"><%- priceTypeOptions(product && product.purchasePriceType) %></select>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">Wholesale Price</label>
-            <div class="input-group">
-              <input type="number" name="wholesalePrice" class="form-control" step="0.01" min="0" value="<%= val('wholesalePrice') %>">
-              <select name="wholesalePriceType" class="form-select" style="max-width: 140px;"><%- priceTypeOptions(product && product.wholesalePriceType) %></select>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">Minimum Wholesale Qty</label>
-            <input type="number" name="minWholesaleQty" class="form-control" step="0.01" min="0" value="<%= val('minWholesaleQty') %>">
-          </div>
+      <section class="form-section" aria-labelledby="secPricing">
+        <div class="form-section-head">
+          <h2 class="form-section-title" id="secPricing">Pricing &amp; tax</h2>
+          <div class="form-section-desc">“With Tax” means the price already includes GST; it is backed out on the invoice, never added again.</div>
         </div>
-
-        <div class="form-section-title">Tax</div>
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">GST Rate</label>
+        <div class="fgrid">
+          <div class="s5">
+            <label class="form-label" for="salePrice">Sale price <span class="req">*</span></label>
+            <div class="price-pair">
+              <span class="rupee">₹</span>
+              <input type="number" id="salePrice" name="salePrice" class="form-control<%= invalid(fe, 'salePrice') %>" step="0.01" min="0" required value="<%= val('salePrice') %>" placeholder="0.00">
+              <select name="priceType" class="form-select" aria-label="Sale price tax treatment"><%- priceTypeOptions(product && product.priceType) %></select>
+            </div>
+            <%- fieldError(fe, 'salePrice') %>
+          </div>
+          <div class="s5">
+            <label class="form-label" for="purchasePrice">Purchase price</label>
+            <div class="price-pair">
+              <span class="rupee">₹</span>
+              <input type="number" id="purchasePrice" name="purchasePrice" class="form-control<%= invalid(fe, 'purchasePrice') %>" step="0.01" min="0" value="<%= val('purchasePrice') %>" placeholder="0.00">
+              <select name="purchasePriceType" class="form-select" aria-label="Purchase price tax treatment"><%- priceTypeOptions(product && product.purchasePriceType) %></select>
+            </div>
+            <%- fieldError(fe, 'purchasePrice') %>
+          </div>
+          <div class="break"></div>
+          <div class="s4">
+            <label class="form-label" for="gstRateSelect">GST rate</label>
             <select id="gstRateSelect" name="taxId" class="form-select">
-              <option value="" disabled <%= !product || !product.taxId ? 'selected' : '' %>>Select GST Rate</option>
+              <option value="" disabled <%= !product || !product.taxId ? 'selected' : '' %>>Select GST rate</option>
               <% taxes.forEach(function(t) { %>
                 <option value="<%= t.id %>" data-rate="<%= t.rate %>" <%= product && product.taxId === t.id ? 'selected' : '' %>><%= t.name %> (<%= t.rate %>%)</option>
               <% }) %>
-              <option value="" <%= product && product.taxId === null ? 'selected' : (!product || !product.taxId ? '' : '') %>>Exempt</option>
+              <option value="" <%= product && product.taxId === null ? 'selected' : '' %>>Exempt / Nil</option>
+            </select>
+          </div>
+          <div class="break"></div>
+          <div class="s5">
+            <label class="form-label" for="wholesalePrice">Wholesale price <span class="text-muted fw-normal">(optional)</span></label>
+            <div class="price-pair">
+              <span class="rupee">₹</span>
+              <input type="number" id="wholesalePrice" name="wholesalePrice" class="form-control<%= invalid(fe, 'wholesalePrice') %>" step="0.01" min="0" value="<%= val('wholesalePrice') %>" placeholder="0.00">
+              <select name="wholesalePriceType" class="form-select" aria-label="Wholesale price tax treatment"><%- priceTypeOptions(product && product.wholesalePriceType) %></select>
+            </div>
+          </div>
+          <div class="s3">
+            <label class="form-label" for="minWholesaleQty">Min. wholesale qty</label>
+            <input type="number" id="minWholesaleQty" name="minWholesaleQty" class="form-control text-end<%= invalid(fe, 'minWholesaleQty') %>" step="0.01" min="0" value="<%= val('minWholesaleQty') %>">
+            <%- fieldError(fe, 'minWholesaleQty') %>
+          </div>
+        </div>
+      </section>
+
+      <section class="form-section" aria-labelledby="secStock" data-goods-only>
+        <div class="form-section-head">
+          <h2 class="form-section-title" id="secStock">Stock</h2>
+          <div class="form-section-desc"><%= isEdit ? 'To correct stock later, use “Adjust stock” so the change is recorded with a reason.' : 'Quantity you have on hand today.' %></div>
+        </div>
+        <div class="fgrid">
+          <div class="s3">
+            <label class="form-label" for="openingStock">Opening quantity</label>
+            <input type="number" id="openingStock" name="openingStock" class="form-control text-end<%= invalid(fe, 'openingStock') %>" step="0.01" min="0" value="<%= num('openingStock', 0) %>">
+            <%- fieldError(fe, 'openingStock') %>
+          </div>
+          <div class="s3">
+            <label class="form-label" for="openingStockPrice">At price / unit</label>
+            <div class="price-pair"><span class="rupee">₹</span><input type="number" id="openingStockPrice" name="openingStockPrice" class="form-control" step="0.01" min="0" value="<%= val('openingStockPrice') %>" placeholder="0.00"></div>
+          </div>
+          <div class="s3">
+            <label class="form-label" for="openingStockDate">As of date</label>
+            <input type="date" id="openingStockDate" name="openingStockDate" class="form-control" value="<%= openingStockDate %>">
+          </div>
+          <div class="s3">
+            <label class="form-label" for="minStock">Low-stock alert at</label>
+            <input type="number" id="minStock" name="minStock" class="form-control text-end<%= invalid(fe, 'minStock') %>" step="0.01" min="0" value="<%= num('minStock', 0) %>">
+            <%- fieldError(fe, 'minStock') %>
+          </div>
+          <div class="s6">
+            <label class="form-label" for="stockLocation">Storage location</label>
+            <input type="text" id="stockLocation" name="stockLocation" class="form-control" maxlength="80" value="<%= val('stockLocation') %>" placeholder="e.g. Rack B2">
+          </div>
+        </div>
+      </section>
+
+      <details class="form-section" <%= hasExtras ? 'open' : '' %>>
+        <summary>
+          <div>
+            <h2 class="form-section-title">Image, discount &amp; more</h2>
+            <div class="form-section-desc">Optional.</div>
+          </div>
+        </summary>
+        <div class="fgrid">
+          <div class="s6">
+            <span class="form-label">Item image</span>
+            <div class="uploader" data-uploader>
+              <div class="uploader-preview">
+                <% if (val('imagePath')) { %><img src="<%= val('imagePath') %>" alt="Current item image"><% } else { %><i class="icon-image"></i><% } %>
+              </div>
+              <div class="uploader-actions">
+                <div class="btns">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-uploader-pick><i class="icon-upload"></i> <%= val('imagePath') ? 'Replace' : 'Upload' %></button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-uploader-clear hidden>Undo</button>
+                  <% if (val('imagePath')) { %>
+                    <label class="btn btn-sm btn-outline-danger mb-0"><input type="checkbox" name="removeImage" value="1" class="form-check-input me-1"> Remove</label>
+                  <% } %>
+                </div>
+                <div class="uploader-name"><%= val('imagePath') ? 'Current image' : 'PNG, JPG or WEBP, up to 2 MB' %></div>
+              </div>
+              <input type="file" name="image" accept="image/png,image/jpeg,image/webp" aria-label="Item image">
+            </div>
+          </div>
+          <div class="s3">
+            <label class="form-label" for="defaultDiscount">Default discount</label>
+            <input type="number" id="defaultDiscount" name="defaultDiscount" class="form-control text-end<%= invalid(fe, 'defaultDiscount') %>" step="0.01" min="0" value="<%= num('defaultDiscount', 0) %>">
+            <%- fieldError(fe, 'defaultDiscount') %>
+          </div>
+          <div class="s3">
+            <label class="form-label" for="defaultDiscountType">Discount type</label>
+            <select id="defaultDiscountType" name="defaultDiscountType" class="form-select">
+              <option value="PERCENTAGE" <%= (!product || product.defaultDiscountType !== 'FIXED') ? 'selected' : '' %>>Percent (%)</option>
+              <option value="FIXED" <%= (product && product.defaultDiscountType === 'FIXED') ? 'selected' : '' %>>Amount (₹)</option>
             </select>
           </div>
         </div>
-
-        <div class="form-section-title">Stock</div>
-        <div class="row g-3">
-          <div class="col-md-4">
-            <label class="form-label small fw-semibold">Opening Quantity</label>
-            <input type="number" name="openingStock" class="form-control" step="0.01" min="0" value="<%= product ? product.openingStock || 0 : 0 %>">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label small fw-semibold">At Price (per unit)</label>
-            <input type="number" name="openingStockPrice" class="form-control" step="0.01" min="0" value="<%= val('openingStockPrice') %>">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label small fw-semibold">As of Date</label>
-            <input type="date" name="openingStockDate" class="form-control" value="<%= openingStockDate %>">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">Location</label>
-            <input type="text" name="stockLocation" class="form-control" value="<%= val('stockLocation') %>">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">Minimum Stock</label>
-            <input type="number" name="minStock" class="form-control" step="0.01" min="0" value="<%= product ? product.minStock || 0 : 0 %>">
-          </div>
-        </div>
-
-        <div class="form-section-title">Default Discount</div>
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">Discount Value</label>
-            <input type="number" name="defaultDiscount" class="form-control" step="0.01" min="0" value="<%= product ? product.defaultDiscount || 0 : 0 %>">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label small fw-semibold">Discount Type</label>
-            <select name="defaultDiscountType" class="form-select">
-              <option value="PERCENTAGE" <%= (!product || product.defaultDiscountType === 'PERCENTAGE') ? 'selected' : '' %>>Percentage</option>
-              <option value="FIXED" <%= (product && product.defaultDiscountType === 'FIXED') ? 'selected' : '' %>>Fixed Amount</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="mt-4 d-flex gap-2">
-          <button type="submit" class="btn btn-primary-app px-4" data-shortcut-save>Save Item</button>
-          <a href="/products" class="btn btn-outline-secondary px-4">Cancel</a>
-        </div>
-      </form>
+      </details>
     </div>
+
+    <div class="action-bar">
+      <span class="hint"><span class="req">*</span> Required · <kbd>Ctrl</kbd>+<kbd>S</kbd> to save</span>
+      <div class="btns">
+        <a href="/products" class="btn btn-outline-secondary" data-back-to="/products">Cancel</a>
+        <% if (!isEdit) { %><button type="submit" name="after" value="new" class="btn btn-outline-primary">Save &amp; add another</button><% } %>
+        <button type="submit" class="btn btn-primary" data-shortcut-save><i class="icon-check"></i> <%= isEdit ? 'Save changes' : 'Save item' %></button>
+      </div>
+    </div>
+  </form>
   </div>
 
-  <% if (product && product.id) { %>
-  <div class="col-lg-4">
-      <div class="card p-3 mb-3">
-        <div class="stat-label text-muted small">Current Stock</div>
-        <div class="stat-value fs-3 fw-bold"><%= Number(product.currentStock) %></div>
+  <% if (isEdit) { %>
+  <aside class="side-stack">
+    <div class="panel">
+      <div class="panel-body">
+        <div class="kpi-label">Current stock</div>
+        <div class="kpi-value <%= Number(product.currentStock) <= 0 ? 'text-danger' : '' %>"><%= qty(product.currentStock) %> <span class="fs-6 fw-normal text-muted"><%= product.unit ? product.unit.shortName : '' %></span></div>
+        <% if (!product.isService && Number(product.currentStock) <= Number(product.minStock)) { %><div class="kpi-sub text-danger">At or below the low-stock level (<%= qty(product.minStock) %>)</div><% } %>
       </div>
-      <div class="card p-3">
-        <h6 class="fw-bold small text-uppercase text-muted mb-3">Transaction History</h6>
+      <% if (!product.isService) { %>
+      <form method="POST" action="/products/<%= product.id %>/adjust-stock" class="panel-footer">
+        <div class="fw-semibold small mb-2">Adjust stock</div>
+        <div class="d-flex gap-2 mb-2">
+          <select name="direction" class="form-select form-select-sm" style="max-width:104px" aria-label="Add or reduce"><option value="ADD">Add</option><option value="REDUCE">Reduce</option></select>
+          <input type="number" name="quantity" class="form-control form-control-sm text-end" min="0.01" step="0.01" placeholder="Qty" required aria-label="Quantity">
+          <input type="date" name="date" class="form-control form-control-sm" value="<%= new Date().toISOString().slice(0,10) %>" aria-label="Date">
+        </div>
+        <input type="text" name="reason" class="form-control form-control-sm mb-2" maxlength="200" placeholder="Reason (damaged, recount…)" required aria-label="Reason">
+        <button class="btn btn-sm btn-outline-primary w-100">Save adjustment</button>
+      </form>
+      <% } %>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><h2 class="panel-title">Stock history</h2><span class="small text-muted">Last 25</span></div>
+      <div class="history-list">
         <% if (!stockTransactions || stockTransactions.length === 0) { %>
-          <div class="text-muted small">No transactions yet.</div>
+          <div class="empty-state py-4">No stock movements yet.</div>
         <% } else { %>
           <% stockTransactions.forEach(function(t) { %>
-            <div class="d-flex justify-content-between border-bottom py-2 small">
-              <div>
-                <div class="fw-semibold"><%= t.type %><%= t.referenceInvoice ? ' · ' + t.referenceInvoice.invoiceNo : '' %></div>
-                <div class="text-muted"><%= new Date(t.date).toLocaleDateString('en-IN') %><%= t.referenceInvoice ? ' · ' + t.referenceInvoice.customer.name : '' %></div>
+            <div class="history-row">
+              <div class="min-w-0">
+                <div class="fw-semibold"><%= movementLabels[t.type] || t.type %><%= t.referenceInvoice ? ' · ' + t.referenceInvoice.invoiceNo : '' %></div>
+                <div class="text-muted"><%= fdate(t.date) %><%= t.referenceInvoice ? ' · ' + t.referenceInvoice.customer.name : '' %></div>
+                <% if (t.note) { %><div class="text-muted fst-italic"><%= t.note %></div><% } %>
               </div>
-              <div class="text-end">
-                <div class="<%= Number(t.quantity) < 0 ? 'text-danger' : 'text-success' %>"><%= Number(t.quantity) > 0 ? '+' : '' %><%= Number(t.quantity) %></div>
-                <div class="text-muted">Bal: <%= Number(t.resultingStock) %></div>
+              <div class="text-end num">
+                <div class="fw-semibold <%= Number(t.quantity) < 0 ? 'text-danger' : 'text-success' %>"><%= Number(t.quantity) > 0 ? '+' : '' %><%= qty(t.quantity) %></div>
+                <div class="text-muted">Bal <%= qty(t.resultingStock) %></div>
               </div>
             </div>
           <% }) %>
         <% } %>
       </div>
-  </div>
+    </div>
+  </aside>
   <% } %>
+  </div>
 </div>
 
 <script>
@@ -226,6 +308,17 @@
     }
     base.addEventListener('change', sync);
     secondary.addEventListener('change', sync);
+
+    // Services have no stock and use SAC instead of HSN
+    var goodsOnly = document.querySelectorAll('[data-goods-only]');
+    function syncType() {
+      var service = document.getElementById('typeService').checked;
+      goodsOnly.forEach(function (el) { el.hidden = service; });
+      document.querySelector('.label-goods').classList.toggle('d-none', service);
+      document.querySelector('.label-service').classList.toggle('d-none', !service);
+    }
+    document.querySelectorAll('input[name="itemType"]').forEach(function (r) { r.addEventListener('change', syncType); });
+    syncType();
   })();
 </script>
 <script src="/js/hsn-suggest.js"></script>

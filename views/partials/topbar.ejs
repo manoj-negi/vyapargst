@@ -1,12 +1,85 @@
-<header class="topbar">
-  <button class="topbar-menu-btn" id="mobileMenuToggle" type="button" aria-label="Open menu">
+<%
+  var today = new Date();
+  var fyStart = today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1;
+  function fyLabel(y) { return y + '-' + String((y + 1) % 100).padStart(2, '0'); }
+  function iso(d) { return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+  // Current and previous financial year (April–March), each linking to its reports for those dates
+  var years = [fyStart, fyStart - 1].map(function (y) {
+    var to = y === fyStart ? iso(today) : (y + 1) + '-03-31';
+    return { label: fyLabel(y), qs: 'from=' + y + '-04-01&to=' + to, current: y === fyStart };
+  });
+  var hasBiz = typeof business !== 'undefined' && business;
+  var who = typeof userName !== 'undefined' ? userName : '';
+%>
+<header class="topbar no-print">
+  <button class="topbar-menu-btn" id="mobileMenuToggle" type="button" aria-label="Open menu" aria-controls="sidebar">
     <i class="icon-menu"></i>
   </button>
-  <h1 class="topbar-title"><%= pageTitle %></h1>
-  <div class="topbar-user">
-    <span class="topbar-user-name"><i class="icon-user"></i> <%= typeof userName !== 'undefined' ? userName : '' %></span>
-    <form action="/logout" method="POST" class="m-0">
-      <button type="submit" class="btn btn-sm btn-outline-danger"><i class="icon-log-out"></i> Logout</button>
-    </form>
+  <div class="topbar-context">
+    <span class="topbar-date"><i class="icon-calendar-days"></i> <%= today.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) %></span>
+    <% if (hasBiz) { %>
+    <div class="dropdown">
+      <button class="fy-button dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Financial year <%= years[0].label %>: reports">
+        <span class="dot" aria-hidden="true"></span><span class="fy-long">FY&nbsp;</span><%= years[0].label %>
+      </button>
+      <ul class="dropdown-menu">
+        <% years.forEach(function (y, i) { %>
+          <% if (i) { %><li><hr class="dropdown-divider"></li><% } %>
+          <li><h6 class="dropdown-header">FY <%= y.label %><%= y.current ? ' · current' : '' %></h6></li>
+          <li><a class="dropdown-item" href="/reports/sales?<%= y.qs %>"><i class="icon-file-text"></i> Sales register</a></li>
+          <li><a class="dropdown-item" href="/reports/purchases?<%= y.qs %>"><i class="icon-shopping-cart"></i> Purchase register</a></li>
+          <li><a class="dropdown-item" href="/reports/gst-summary?<%= y.qs %>"><i class="icon-percent"></i> GST summary</a></li>
+        <% }) %>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="/reports"><i class="icon-chart-column"></i> All reports</a></li>
+      </ul>
+    </div>
+    <% } %>
+  </div>
+  <div class="topbar-actions">
+    <% if (hasBiz) { %>
+    <div class="dropdown">
+      <button class="btn btn-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="icon-plus"></i><span class="label">Create</span>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><h6 class="dropdown-header">Sale</h6></li>
+        <li><a class="dropdown-item" href="/invoices/new"><i class="icon-file-text"></i> Sale invoice <kbd>Alt+I</kbd></a></li>
+        <li><a class="dropdown-item" href="/estimates/new"><i class="icon-file-pen-line"></i> Estimate</a></li>
+        <li><a class="dropdown-item" href="/payments/new?direction=IN"><i class="icon-hand-coins"></i> Payment in <kbd>Alt+R</kbd></a></li>
+        <li><h6 class="dropdown-header">Purchase</h6></li>
+        <li><a class="dropdown-item" href="/purchases/new"><i class="icon-shopping-cart"></i> Purchase bill <kbd>Alt+P</kbd></a></li>
+        <li><a class="dropdown-item" href="/payments/new?direction=OUT"><i class="icon-banknote"></i> Payment out</a></li>
+        <li><a class="dropdown-item" href="/expenses/new"><i class="icon-wallet"></i> Expense</a></li>
+        <li><h6 class="dropdown-header">Masters</h6></li>
+        <li><a class="dropdown-item" href="/products/new"><i class="icon-package"></i> Item</a></li>
+        <li><a class="dropdown-item" href="/customers/new"><i class="icon-user-plus"></i> Party</a></li>
+      </ul>
+    </div>
+    <% } %>
+    <div class="dropdown">
+      <button class="account-button" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account menu">
+        <span class="avatar" aria-hidden="true"><%= initials(who) || '?' %></span>
+        <span class="name"><%= who %></span>
+        <i class="icon-chevron-down text-muted" aria-hidden="true"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li class="menu-meta">
+          <span class="avatar" aria-hidden="true"><%= initials(who) || '?' %></span>
+          <span><strong><%= who %></strong><span><%= hasBiz ? business.name : 'No business yet' %></span></span>
+        </li>
+        <li><a class="dropdown-item" href="/business/setup"><i class="icon-building-2"></i> Business profile</a></li>
+        <% if (hasBiz) { %>
+        <li><a class="dropdown-item" href="/settings/documents"><i class="icon-hash"></i> Numbering &amp; billing</a></li>
+        <li><a class="dropdown-item" href="/settings/backup"><i class="icon-database-backup"></i> Backup</a></li>
+        <% } %>
+        <li><hr class="dropdown-divider"></li>
+        <li>
+          <form action="/logout" method="POST" class="m-0" data-no-loading>
+            <button type="submit" class="dropdown-item text-danger"><i class="icon-log-out"></i> Log out</button>
+          </form>
+        </li>
+      </ul>
+    </div>
   </div>
 </header>

@@ -1,121 +1,240 @@
 <%- include('../partials/layout-start', { title: 'Business Profile', activeNav: 'business' }) %>
+<%
+  var b = business || {};
+  var fe = fieldErrors || {};
+  function v(f, d) { return b[f] != null ? b[f] : (d || ''); }
+  function uploader(name, path, label, hint, accept) {
+    return { name: name, path: path, label: label, hint: hint, accept: accept };
+  }
+  var uploads = [
+    uploader('logo', b.logoPath, 'Logo', 'PNG, JPG, WEBP or SVG · up to 2 MB', 'image/png,image/jpeg,image/webp,image/svg+xml')
+  ];
+  var sig = {
+    current: b.signaturePath || '',
+    original: b.signatureOriginalPath || b.signaturePath || '',
+    clean: b.signatureCleanPath || '',
+    useClean: b.signatureUseClean !== false && !!b.signatureCleanPath,
+    width: Number(b.signatureWidthMm) || 50,
+    show: b.signatureOnInvoices === true || b.signatureOnInvoices === 'on',
+    hidesHeading: b.signatureHidesHeading === undefined ? true : (b.signatureHidesHeading === true || b.signatureHidesHeading === 'on'),
+  };
+%>
+<div class="page page-narrow">
+  <%- include('../partials/page-header', { title: 'Business profile', subtitle: 'Printed on every new invoice, estimate and return. Documents already issued keep the details they were created with.' }) %>
+  <%- include('../partials/form-errors', { errors: errors }) %>
 
-<div class="card p-4" style="max-width: 820px;">
-  <h5 class="fw-bold mb-1">Business Profile</h5>
-  <p class="text-muted small mb-4">This information appears automatically on every invoice you create.</p>
-
-  <% if (errors && errors.length) { %>
-    <div class="alert alert-danger py-2 small">
-      <ul class="mb-0 ps-3">
-        <% errors.forEach(function(e) { %><li><%= e %></li><% }) %>
-      </ul>
-    </div>
-  <% } %>
-
-  <form method="POST" action="/business/setup" enctype="multipart/form-data">
-    <div class="form-section-title">Business Details</div>
-    <div class="row g-3">
-      <div class="col-md-6">
-        <label class="form-label small fw-semibold">Business Name *</label>
-        <input type="text" name="name" class="form-control" required value="<%= business ? business.name || '' : '' %>">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label small fw-semibold">Trade Name</label>
-        <input type="text" name="tradeName" class="form-control" value="<%= business ? business.tradeName || '' : '' %>">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label small fw-semibold">Business Logo</label>
-        <input type="file" name="logo" class="form-control" accept="image/png,image/jpeg,image/webp,image/svg+xml">
-        <% if (business && business.logoPath) { %>
-          <img src="<%= business.logoPath %>" class="mt-2" style="height:40px;border-radius:6px" alt="Current logo">
-        <% } %>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label small fw-semibold">Business Type</label>
-        <input type="text" name="businessType" class="form-control" placeholder="e.g. Retailer, Wholesaler, Manufacturer" value="<%= business ? business.businessType || '' : '' %>">
-      </div>
-    </div>
-
-    <div class="form-section-title">GST Registration</div>
-    <div class="row g-3">
-      <div class="col-md-4">
-        <label class="form-label small fw-semibold">GST Registered</label>
-        <select name="gstRegistered" class="form-select">
-          <option value="YES" <%= (!business || business.gstRegistered) ? 'selected' : '' %>>Yes</option>
-          <option value="NO" <%= (business && !business.gstRegistered) ? 'selected' : '' %>>No</option>
-        </select>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label small fw-semibold">GSTIN</label>
-        <input type="text" name="gstin" class="form-control text-uppercase" maxlength="15" placeholder="22AAAAA0000A1Z5" value="<%= business ? business.gstin || '' : '' %>">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label small fw-semibold">PAN</label>
-        <input type="text" name="pan" class="form-control text-uppercase" maxlength="10" value="<%= business ? business.pan || '' : '' %>">
-      </div>
-    </div>
-
-    <div class="form-section-title">Contact & Address</div>
-    <div class="row g-3">
-      <div class="col-md-6">
-        <label class="form-label small fw-semibold">Phone</label>
-        <input type="text" name="phone" class="form-control" placeholder="9876543210" value="<%= business ? business.phone || '' : '' %>">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label small fw-semibold">Email</label>
-        <input type="email" name="email" class="form-control" value="<%= business ? business.email || '' : '' %>">
-      </div>
-      <div class="col-12">
-        <label class="form-label small fw-semibold">Address</label>
-        <textarea name="address" class="form-control" rows="2"><%= business ? business.address || '' : '' %></textarea>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label small fw-semibold">City</label>
-        <input type="text" name="city" class="form-control" value="<%= business ? business.city || '' : '' %>">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label small fw-semibold">State *</label>
-        <select name="state" class="form-select" required>
-          <option value="">Select state</option>
-          <% states.forEach(function(s) { %>
-            <option value="<%= s %>" <%= business && business.state === s ? 'selected' : '' %>><%= s %></option>
+  <form method="POST" action="/business/setup" enctype="multipart/form-data" data-dirty-guard novalidate>
+    <div class="panel">
+      <section class="form-section">
+        <div class="form-section-head"><h2 class="form-section-title">Business details</h2></div>
+        <div class="fgrid">
+          <div class="s6"><label class="form-label" for="bName">Business name <span class="req">*</span></label><input type="text" id="bName" name="name" class="form-control<%= invalid(fe, 'name') %>" required maxlength="150" value="<%= v('name') %>"><%- fieldError(fe, 'name') %></div>
+          <div class="s6"><label class="form-label" for="bTrade">Trade name</label><input type="text" id="bTrade" name="tradeName" class="form-control" maxlength="150" value="<%= v('tradeName') %>"></div>
+          <div class="s6"><label class="form-label" for="bType">Business type</label><input type="text" id="bType" name="businessType" class="form-control" maxlength="80" placeholder="e.g. Retailer, Wholesaler" value="<%= v('businessType') %>"></div>
+          <div class="break"></div>
+          <% uploads.forEach(function(u) { %>
+          <div class="s6">
+            <span class="form-label"><%= u.label %></span>
+            <div class="uploader" data-uploader>
+              <div class="uploader-preview"><% if (u.path) { %><img src="<%= u.path %>" alt="Current <%= u.label.toLowerCase() %>"><% } else { %><i class="icon-image"></i><% } %></div>
+              <div class="uploader-actions">
+                <div class="btns">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-uploader-pick><i class="icon-upload"></i> <%= u.path ? 'Replace' : 'Upload' %></button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-uploader-clear hidden>Undo</button>
+                </div>
+                <div class="uploader-name"><%= u.hint %></div>
+              </div>
+              <input type="file" name="<%= u.name %>" accept="<%= u.accept %>" aria-label="<%= u.label %> file">
+            </div>
+          </div>
           <% }) %>
-        </select>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label small fw-semibold">Pincode</label>
-        <input type="text" name="pincode" class="form-control" maxlength="6" value="<%= business ? business.pincode || '' : '' %>">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label small fw-semibold">Country</label>
-        <input type="text" name="country" class="form-control" value="<%= business ? business.country || 'India' : 'India' %>">
-      </div>
-    </div>
+        </div>
+      </section>
 
-    <div class="form-section-title">Bank Details <span class="text-muted fw-normal small">(printed on invoices)</span></div>
-    <div class="row g-3">
-      <div class="col-md-6">
-        <label class="form-label small fw-semibold">Bank Name &amp; Branch</label>
-        <input type="text" name="bankName" class="form-control" placeholder="Canara Bank - Sahastradhara Road" value="<%= business ? business.bankName || '' : '' %>">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label small fw-semibold">Account Holder's Name</label>
-        <input type="text" name="bankAccountHolder" class="form-control" value="<%= business ? business.bankAccountHolder || '' : '' %>">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label small fw-semibold">Account No.</label>
-        <input type="text" name="bankAccountNo" class="form-control" inputmode="numeric" maxlength="18" value="<%= business ? business.bankAccountNo || '' : '' %>">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label small fw-semibold">IFSC Code</label>
-        <input type="text" name="bankIfsc" class="form-control text-uppercase" maxlength="11" value="<%= business ? business.bankIfsc || '' : '' %>">
-      </div>
-    </div>
+      <section class="form-section" id="stamp">
+        <div class="form-section-head">
+          <h2 class="form-section-title">Stamp &amp; signature</h2>
+          <div class="form-section-desc">Printed in the “Authorised Signatory” box of sale invoices, estimates and returns (screen, print and PDF). A photo of the stamp on paper works: a copy with a transparent background is made automatically, and your original is kept.</div>
+        </div>
+        <div class="stamp-setup" data-stamp-setup data-business-name="<%= (b.name || '').toUpperCase() %>">
+          <div class="stamp-controls">
+            <div class="uploader">
+              <div class="uploader-preview stamp-thumb checker"><% if (sig.current) { %><img src="<%= sig.current %>" alt="Current stamp and signature" data-stamp-thumb><% } else { %><i class="icon-stamp" aria-hidden="true"></i><% } %></div>
+              <div class="uploader-actions">
+                <div class="btns">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-stamp-pick><i class="icon-upload"></i> <%= sig.current ? 'Replace' : 'Upload' %></button>
+                  <% if (sig.current) { %><button type="button" class="btn btn-sm btn-outline-danger" data-stamp-remove><i class="icon-trash-2"></i> Remove</button><% } %>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-stamp-undo hidden>Undo</button>
+                </div>
+                <div class="uploader-name" data-stamp-name>PNG with a transparent background is best; a JPG/PNG photo is fine · up to 8 MB</div>
+              </div>
+              <input type="file" name="signature" accept="image/png,image/jpeg,image/webp" aria-label="Stamp and signature image" data-stamp-input hidden>
+              <input type="checkbox" name="removeSignature" data-stamp-remove-flag hidden>
+            </div>
 
-    <div class="mt-4">
-      <button type="submit" class="btn btn-primary-app px-4">Save Business Profile</button>
+            <% if (sig.clean && sig.original) { %>
+            <fieldset class="stamp-mode" data-stamp-mode>
+              <legend class="form-label">Background</legend>
+              <label class="form-check"><input class="form-check-input" type="radio" name="signatureMode" value="clean" <%= sig.useClean ? 'checked' : '' %> data-src="<%= sig.clean %>"> <span class="form-check-label">Transparent (recommended)</span></label>
+              <label class="form-check"><input class="form-check-input" type="radio" name="signatureMode" value="original" <%= sig.useClean ? '' : 'checked' %> data-src="<%= sig.original %>"> <span class="form-check-label">Original upload, as photographed</span></label>
+            </fieldset>
+            <% } %>
+
+            <div>
+              <label class="form-label" for="stampWidth">Size on the invoice: <strong data-stamp-width-label><%= sig.width %> mm</strong> wide</label>
+              <input type="range" class="form-range" id="stampWidth" name="signatureWidthMm" min="25" max="80" step="1" value="<%= sig.width %>" data-stamp-width>
+            </div>
+            <label class="form-check"><input class="form-check-input" type="checkbox" name="signatureOnInvoices" <%= sig.show ? 'checked' : '' %> data-stamp-show> <span class="form-check-label">Show stamp and signature on invoices</span></label>
+            <label class="form-check"><input class="form-check-input" type="checkbox" name="signatureHidesHeading" <%= sig.hidesHeading ? 'checked' : '' %> data-stamp-heading> <span class="form-check-label">The image already includes “For <%= b.name || 'your business' %>” (don't print the heading again)</span></label>
+          </div>
+
+          <div class="stamp-preview" aria-label="Invoice preview">
+            <div class="stamp-preview-title">Invoice preview <span class="text-muted fw-normal">(signatory box, to scale)</span></div>
+            <div class="stamp-preview-box">
+              <div class="stamp-preview-head" data-stamp-head>For <%= (b.name || '').toUpperCase() %>:</div>
+              <div class="stamp-preview-body">
+                <img alt="" data-stamp-preview <%- sig.current ? 'src="' + sig.current + '"' : 'hidden' %> style="width: <%= sig.width %>mm">
+                <div class="stamp-preview-empty" data-stamp-empty <%= sig.current ? 'hidden' : '' %>>No image: the box prints text only</div>
+                <div>Authorised Signatory</div>
+              </div>
+            </div>
+            <div class="form-text" data-stamp-hint></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <div class="form-section-head"><h2 class="form-section-title">GST registration</h2></div>
+        <div class="fgrid">
+          <div class="s3"><label class="form-label" for="bReg">GST registered</label>
+            <select id="bReg" name="gstRegistered" class="form-select">
+              <option value="YES" <%= (!business || b.gstRegistered) ? 'selected' : '' %>>Yes</option>
+              <option value="NO" <%= (business && b.gstRegistered === false) || b.gstRegistered === 'NO' ? 'selected' : '' %>>No (bill of supply)</option>
+            </select></div>
+          <div class="s4"><label class="form-label" for="bGstin">GSTIN</label><input type="text" id="bGstin" name="gstin" class="form-control text-uppercase<%= invalid(fe, 'gstin') %>" maxlength="15" placeholder="05ABCDE1234F1Z5" value="<%= v('gstin') %>"><%- fieldError(fe, 'gstin') %></div>
+          <div class="s3"><label class="form-label" for="bPan">PAN</label><input type="text" id="bPan" name="pan" class="form-control text-uppercase<%= invalid(fe, 'pan') %>" maxlength="10" value="<%= v('pan') %>"><%- fieldError(fe, 'pan') %></div>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <div class="form-section-head"><h2 class="form-section-title">Contact &amp; address</h2><div class="form-section-desc">Your state decides whether sales are intra-state (CGST + SGST) or inter-state (IGST).</div></div>
+        <div class="fgrid">
+          <div class="s4"><label class="form-label" for="bPhone">Phone</label><input type="tel" id="bPhone" name="phone" class="form-control<%= invalid(fe, 'phone') %>" maxlength="15" placeholder="9876543210" value="<%= v('phone') %>"><%- fieldError(fe, 'phone') %></div>
+          <div class="s5"><label class="form-label" for="bEmail">Email</label><input type="email" id="bEmail" name="email" class="form-control<%= invalid(fe, 'email') %>" maxlength="120" value="<%= v('email') %>"><%- fieldError(fe, 'email') %></div>
+          <div class="s12"><label class="form-label" for="bAddr">Address</label><textarea id="bAddr" name="address" class="form-control" rows="2" maxlength="500"><%= v('address') %></textarea></div>
+          <div class="s4"><label class="form-label" for="bCity">City</label><input type="text" id="bCity" name="city" class="form-control" maxlength="80" value="<%= v('city') %>"></div>
+          <div class="s4"><label class="form-label" for="bState">State <span class="req">*</span></label>
+            <select id="bState" name="state" class="form-select<%= invalid(fe, 'state') %>" required>
+              <option value="">Select state</option>
+              <% states.forEach(function(s) { %><option value="<%= s %>" <%= b.state === s ? 'selected' : '' %>><%= s %></option><% }) %>
+            </select><%- fieldError(fe, 'state') %></div>
+          <div class="s2"><label class="form-label" for="bPin">PIN code</label><input type="text" id="bPin" name="pincode" class="form-control" maxlength="6" inputmode="numeric" value="<%= v('pincode') %>"></div>
+          <div class="s2"><label class="form-label" for="bCountry">Country</label><input type="text" id="bCountry" name="country" class="form-control" maxlength="60" value="<%= v('country', 'India') %>"></div>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <div class="form-section-head"><h2 class="form-section-title">Bank &amp; UPI</h2><div class="form-section-desc">Shown in the payment box on invoices.</div></div>
+        <div class="fgrid">
+          <div class="s6"><label class="form-label" for="bBank">Bank name &amp; branch</label><input type="text" id="bBank" name="bankName" class="form-control" maxlength="120" placeholder="Canara Bank - Sahastradhara Road" value="<%= v('bankName') %>"></div>
+          <div class="s6"><label class="form-label" for="bHolder">Account holder</label><input type="text" id="bHolder" name="bankAccountHolder" class="form-control" maxlength="120" value="<%= v('bankAccountHolder') %>"></div>
+          <div class="s4"><label class="form-label" for="bAcc">Account number</label><input type="text" id="bAcc" name="bankAccountNo" class="form-control<%= invalid(fe, 'bankAccountNo') %>" inputmode="numeric" maxlength="18" value="<%= v('bankAccountNo') %>"><%- fieldError(fe, 'bankAccountNo') %></div>
+          <div class="s3"><label class="form-label" for="bIfsc">IFSC</label><input type="text" id="bIfsc" name="bankIfsc" class="form-control text-uppercase<%= invalid(fe, 'bankIfsc') %>" maxlength="11" value="<%= v('bankIfsc') %>"><%- fieldError(fe, 'bankIfsc') %></div>
+          <div class="break"></div>
+          <div class="s4"><label class="form-label" for="bUpi">UPI ID</label><input type="text" id="bUpi" name="upiId" class="form-control<%= invalid(fe, 'upiId') %>" maxlength="60" placeholder="name@bank" value="<%= v('upiId') %>"><%- fieldError(fe, 'upiId') %></div>
+          <div class="s5"><label class="form-label" for="bUpiName">UPI payee name</label><input type="text" id="bUpiName" name="upiName" class="form-control" maxlength="80" value="<%= v('upiName') %>"></div>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <div class="form-section-head"><h2 class="form-section-title">Invoice terms</h2><div class="form-section-desc">Copied onto each new invoice and estimate when it is created.</div></div>
+        <textarea name="invoiceTerms" class="form-control" rows="3" maxlength="2000" aria-label="Invoice terms and conditions" placeholder="e.g. Goods once sold will not be taken back. Subject to local jurisdiction."><%= v('invoiceTerms') %></textarea>
+      </section>
+    </div>
+    <div class="action-bar">
+      <span class="hint"><span class="req">*</span> Required</span>
+      <div class="btns"><button type="submit" class="btn btn-primary" data-shortcut-save><i class="icon-check"></i> Save profile</button></div>
     </div>
   </form>
 </div>
+<script>
+  // Stamp & signature: pick / replace / remove, background choice, size, and the to-scale preview
+  (function () {
+    var root = document.querySelector("[data-stamp-setup]");
+    if (!root) return;
+    var input = root.querySelector("[data-stamp-input]");
+    var thumbBox = root.querySelector(".stamp-thumb");
+    var thumbHtml = thumbBox.innerHTML;
+    var nameEl = root.querySelector("[data-stamp-name]");
+    var nameText = nameEl.textContent;
+    var undo = root.querySelector("[data-stamp-undo]");
+    var removeBtn = root.querySelector("[data-stamp-remove]");
+    var removeFlag = root.querySelector("[data-stamp-remove-flag]");
+    var preview = root.querySelector("[data-stamp-preview]");
+    var empty = root.querySelector("[data-stamp-empty]");
+    var width = root.querySelector("[data-stamp-width]");
+    var widthLabel = root.querySelector("[data-stamp-width-label]");
+    var show = root.querySelector("[data-stamp-show]");
+    var heading = root.querySelector("[data-stamp-heading]");
+    var head = root.querySelector("[data-stamp-head]");
+    var hint = root.querySelector("[data-stamp-hint]");
+    var mode = root.querySelector("[data-stamp-mode]");
+    var savedSrc = preview.getAttribute("src") || "";
+    var savedShow = show.checked;
 
+    function setPreview(src) {
+      preview.hidden = !src;
+      if (src) preview.src = src; else preview.removeAttribute("src");
+      empty.hidden = !!src;
+      refresh();
+    }
+    function refresh() {
+      preview.style.width = width.value + "mm";
+      widthLabel.textContent = width.value + " mm";
+      var hasImage = !preview.hidden;
+      head.textContent = hasImage && show.checked && heading.checked ? "" : "For " + root.dataset.businessName + ":";
+      root.querySelector(".stamp-preview-box").classList.toggle("is-off", hasImage && !show.checked);
+      hint.textContent = hasImage && !show.checked ? "Turned off: invoices print the text-only box." : "";
+    }
+    root.querySelector("[data-stamp-pick]").addEventListener("click", function () { input.click(); });
+    input.addEventListener("change", function () {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      var url = URL.createObjectURL(file);
+      thumbBox.innerHTML = '<img alt="Selected image">';
+      thumbBox.querySelector("img").src = url;
+      nameEl.textContent = file.name + " · " + Math.max(1, Math.round(file.size / 1024)) + " KB · a transparent copy is made when you save";
+      removeFlag.checked = false;
+      if (mode) mode.hidden = true; // the background choice applies to the new upload after saving
+      show.checked = true;
+      undo.hidden = false;
+      setPreview(url);
+    });
+    if (removeBtn) removeBtn.addEventListener("click", function () {
+      input.value = "";
+      removeFlag.checked = true;
+      thumbBox.innerHTML = '<i class="icon-stamp" aria-hidden="true"></i>';
+      nameEl.textContent = "Will be removed when you save. Invoices then print the text-only box.";
+      show.checked = false;
+      if (mode) mode.hidden = true;
+      undo.hidden = false;
+      setPreview("");
+    });
+    undo.addEventListener("click", function () {
+      input.value = "";
+      removeFlag.checked = false;
+      thumbBox.innerHTML = thumbHtml;
+      nameEl.textContent = nameText;
+      show.checked = savedShow;
+      if (mode) mode.hidden = false;
+      undo.hidden = true;
+      setPreview(savedSrc);
+    });
+    if (mode) mode.addEventListener("change", function (e) {
+      if (e.target.dataset.src) { setPreview(e.target.dataset.src); var t = thumbBox.querySelector("img"); if (t) t.src = e.target.dataset.src; }
+    });
+    [width, show, heading].forEach(function (el) { el.addEventListener("input", refresh); el.addEventListener("change", refresh); });
+    refresh();
+  })();
+</script>
 <%- include('../partials/layout-end') %>

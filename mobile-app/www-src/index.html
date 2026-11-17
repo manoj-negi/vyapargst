@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Connection required · THE CITY CART</title>
+  <link rel="stylesheet" href="connection.css">
+</head>
+<body>
+  <!-- Start page if the app is built without a server address; it opens the backend straight away. -->
+  <main class="card" role="alert">
+    <img class="logo" src="logo.png" alt="">
+    <h1>Connection required</h1>
+    <p>THE CITY CART needs a connection to your billing server. Nothing is saved on this phone, so no work is lost.</p>
+    <div class="server" id="server"></div>
+    <button type="button" id="retry">Retry</button>
+    <div class="status" id="status" aria-live="polite"></div>
+    <p class="hint" id="hint"></p>
+  </main>
+  <script src="config.js"></script>
+  <script src="connection.js"></script>
+</body>
+</html>

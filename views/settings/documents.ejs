@@ -1,0 +1,90 @@
+<%- include('../partials/layout-start', { title: title, activeNav: activeNav }) %>
+<% var fe = fieldErrors || {};
+   var prefixes = [['invoicePrefix','Sale invoice', true],['estimatePrefix','Estimate'],['creditNotePrefix','Credit note (sale return)', true],['purchasePrefix','Purchase bill'],['debitNotePrefix','Debit note (purchase return)', true],['paymentInPrefix','Payment in'],['paymentOutPrefix','Payment out'],['expensePrefix','Expense']]; %>
+<div class="page page-narrow">
+  <%- include('../partials/page-header', { title: 'Numbering & billing', subtitle: 'Each document type has its own consecutive series. Changing a prefix starts a new series; existing documents keep their numbers.' }) %>
+  <%- include('../partials/form-errors', { errors: errors }) %>
+  <form method="POST" action="/settings/documents" data-dirty-guard novalidate id="docSettings">
+    <div class="panel">
+      <section class="form-section">
+        <div class="form-section-head"><h2 class="form-section-title">Number prefixes</h2><div class="form-section-desc">GST rules: tax invoice, credit note and debit note numbers must be consecutive, unique in a financial year, and at most 16 characters (marked GST).</div></div>
+        <div class="fgrid">
+          <% prefixes.forEach(function(f) { %>
+            <div class="s3">
+              <label class="form-label" for="p-<%= f[0] %>"><%= f[1] %><% if (f[2]) { %> <span class="badge-soft">GST</span><% } %></label>
+              <input type="text" id="p-<%= f[0] %>" name="<%= f[0] %>" class="form-control prefix-input<%= invalid(fe, f[0]) %>" maxlength="12" required value="<%= settings[f[0]] %>" data-gst="<%= f[2] ? 1 : 0 %>">
+              <div class="form-text">e.g. <span class="prefix-sample"><%= sampleDocumentNumber(settings[f[0]] || '', !!settings.financialYearFormat) %></span></div>
+              <%- fieldError(fe, f[0]) %>
+            </div>
+          <% }) %>
+        </div>
+      </section>
+      <section class="form-section">
+        <div class="form-section-head"><h2 class="form-section-title">Numbering</h2></div>
+        <div class="fgrid">
+          <div class="s3">
+            <label class="form-label" for="startNo">First sale invoice number</label>
+            <input type="number" id="startNo" name="invoiceStartNumber" class="form-control text-end<%= invalid(fe, 'invoiceStartNumber') %>" min="1" value="<%= settings.invoiceStartNumber %>">
+            <div class="form-text">Used only when a new series starts.</div>
+          </div>
+          <div class="s9 pt-md-4">
+            <div class="form-check form-switch">
+              <input type="checkbox" class="form-check-input" role="switch" id="fyFormat" name="financialYearFormat" <%= settings.financialYearFormat ? 'checked' : '' %>>
+              <label class="form-check-label" for="fyFormat">Restart numbering every financial year (April–March), e.g. INV-2026-27/0001</label>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="form-section">
+        <div class="form-section-head"><h2 class="form-section-title">Billing rules</h2></div>
+        <div class="fgrid">
+          <div class="s5">
+            <label class="form-label" for="roundOff">Round off totals</label>
+            <select id="roundOff" name="roundOffMode" class="form-select">
+              <option value="AUTOMATIC" <%= settings.roundOffMode === 'AUTOMATIC' ? 'selected' : '' %>>To the nearest rupee (automatic)</option>
+              <option value="MANUAL" <%= settings.roundOffMode === 'MANUAL' ? 'selected' : '' %>>Only when I enter a round-off</option>
+              <option value="DISABLED" <%= settings.roundOffMode === 'DISABLED' ? 'selected' : '' %>>Never</option>
+            </select>
+          </div>
+          <div class="s5">
+            <label class="form-label" for="negStock">When stock would go below zero</label>
+            <select id="negStock" name="negativeStockPolicy" class="form-select">
+              <option value="ALLOW_WITH_WARNING" <%= settings.negativeStockPolicy === 'ALLOW_WITH_WARNING' ? 'selected' : '' %>>Allow it (stock shows negative)</option>
+              <option value="PREVENT" <%= settings.negativeStockPolicy === 'PREVENT' ? 'selected' : '' %>>Block the sale or return</option>
+            </select>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="action-bar"><span class="hint">Changes apply to documents created from now on.</span><div class="btns"><button type="submit" class="btn btn-primary" data-shortcut-save><i class="icon-check"></i> Save settings</button></div></div>
+  </form>
+
+  <% if (sequences.length) { %>
+  <div class="panel mt-3">
+    <div class="panel-header"><h2 class="panel-title">Series in use</h2></div>
+    <table class="table table-app">
+      <thead><tr><th>Prefix</th><th>Financial year</th><th class="num">Last number used</th></tr></thead>
+      <tbody><% sequences.forEach(function(s) { %><tr><td class="cell-main"><%= s.prefix %></td><td><%= s.financialYear || '—' %></td><td class="num"><%= s.lastNumber %></td></tr><% }) %></tbody>
+    </table>
+  </div>
+  <% } %>
+</div>
+<script>
+  // Live preview of the number each prefix produces, and the 16-character GST limit
+  (function () {
+    var fy = document.getElementById('fyFormat');
+    function fyLabel() { var d = new Date(); var y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; return y + '-' + String((y + 1) % 100).padStart(2, '0'); }
+    function sync() {
+      document.querySelectorAll('.prefix-input').forEach(function (input) {
+        var sample = input.value + (fy.checked ? fyLabel() + '/' : '') + '0001';
+        var out = input.parentNode.querySelector('.prefix-sample');
+        out.textContent = sample + (input.dataset.gst === '1' && sample.length > 16 ? ' — ' + sample.length + ' characters, over the GST limit of 16' : '');
+        out.classList.toggle('text-danger', input.dataset.gst === '1' && sample.length > 16);
+      });
+    }
+    document.querySelectorAll('.prefix-input').forEach(function (i) { i.addEventListener('input', sync); });
+    fy.addEventListener('change', sync);
+    sync();
+  })();
+</script>
+<%- include('../partials/layout-end') %>

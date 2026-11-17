@@ -1,59 +1,22 @@
-<%- include('../partials/layout-start', { title: 'Tax Master', activeNav: 'tax-master' }) %>
-
-<div class="row g-4">
-  <div class="col-lg-5">
-    <div class="card p-4">
-      <h6 class="fw-bold mb-3">Add Tax Rate</h6>
-      <form method="POST" action="/settings/tax-master">
-        <div class="mb-3">
-          <label class="form-label small fw-semibold">Name</label>
-          <input type="text" name="name" class="form-control" placeholder="e.g. GST 18%" required>
-        </div>
-        <div class="mb-3">
-          <label class="form-label small fw-semibold">GST Rate (%)</label>
-          <input type="number" name="rate" class="form-control" step="0.01" min="0" max="100" required>
-          <div class="form-text">Automatically split into CGST + SGST (half each) or used as-is for IGST.</div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label small fw-semibold">Cess Rate (%)</label>
-          <input type="number" name="cessRate" class="form-control" step="0.01" min="0" max="100" value="0">
-        </div>
-        <button type="submit" class="btn btn-primary-app w-100">Add Tax Rate</button>
-      </form>
-    </div>
-  </div>
-
-  <div class="col-lg-7">
-    <div class="card">
+<%- include('../partials/layout-start', { title: 'Tax Rates', activeNav: 'tax-master' }) %>
+<div class="page page-medium">
+  <%- include('../partials/page-header', { title: 'Tax rates', subtitle: 'GST slabs used by items. Within your state a rate is split into CGST + SGST (half each); across states it is charged as IGST.' }) %>
+  <div class="d-grid gap-3 settings-split">
+    <div class="panel">
+      <div class="panel-header"><h2 class="panel-title">Rates</h2><span class="small text-muted"><%= taxes.length %> configured</span></div>
       <div class="table-scroll">
-        <table class="table table-app mb-0">
-          <thead>
-            <tr>
-              <th>Name</th><th>Rate</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Cess</th><th>Status</th><th></th>
-            </tr>
-          </thead>
+        <table class="table table-app">
+          <thead><tr><th>Name</th><th class="num">Rate</th><th class="num">CGST</th><th class="num">SGST</th><th class="num">IGST</th><th class="num">Cess</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            <% if (taxes.length === 0) { %>
-              <tr><td colspan="8" class="empty-state">No tax rates configured yet.</td></tr>
-            <% } %>
+            <% if (taxes.length === 0) { %><tr><td colspan="8"><div class="empty-state">No tax rates yet. Add one on the right.</div></td></tr><% } %>
             <% taxes.forEach(function(t) { %>
-              <tr>
-                <td><%= t.name %></td>
-                <td><%= t.rate %>%</td>
-                <td><%= t.cgstRate %>%</td>
-                <td><%= t.sgstRate %>%</td>
-                <td><%= t.igstRate %>%</td>
-                <td><%= t.cessRate %>%</td>
-                <td>
-                  <span class="status-badge <%= t.isActive ? 'status-paid' : 'status-unpaid' %>">
-                    <%= t.isActive ? 'Active' : 'Inactive' %>
-                  </span>
-                </td>
-                <td>
-                  <form method="POST" action="/settings/tax-master/<%= t.id %>/toggle">
-                    <button type="submit" class="btn btn-sm btn-outline-secondary">
-                      <%= t.isActive ? 'Disable' : 'Enable' %>
-                    </button>
+              <tr class="<%= t.isActive ? '' : 'row-muted' %>">
+                <td class="cell-main"><%= t.name %></td>
+                <td class="num"><%= Number(t.rate) %>%</td><td class="num"><%= Number(t.cgstRate) %>%</td><td class="num"><%= Number(t.sgstRate) %>%</td><td class="num"><%= Number(t.igstRate) %>%</td><td class="num"><%= Number(t.cessRate) %>%</td>
+                <td><span class="status-badge <%= t.isActive ? 'status-paid' : 'status-cancelled' %>"><%= t.isActive ? 'Active' : 'Disabled' %></span></td>
+                <td class="text-end">
+                  <form method="POST" action="/settings/tax-master/<%= t.id %>/toggle" class="m-0" <%- t.isActive ? 'data-confirm="Disable ' + t.name + '? Items already using it keep it; it just stops appearing for new items." data-confirm-label="Disable rate" data-confirm-title="Disable ' + t.name + '?" data-confirm-cancel="Keep active" data-confirm-tone="primary"' : '' %>>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary"><%= t.isActive ? 'Disable' : 'Enable' %></button>
                   </form>
                 </td>
               </tr>
@@ -62,7 +25,17 @@
         </table>
       </div>
     </div>
+    <form method="POST" action="/settings/tax-master" class="panel" novalidate>
+      <div class="panel-header"><h2 class="panel-title">Add a rate</h2></div>
+      <div class="panel-body">
+        <div class="fgrid">
+          <div class="s12"><label class="form-label" for="tName">Name <span class="req">*</span></label><input type="text" id="tName" name="name" class="form-control" placeholder="e.g. GST 18%" required maxlength="40"></div>
+          <div class="s6"><label class="form-label" for="tRate">GST rate (%) <span class="req">*</span></label><input type="number" id="tRate" name="rate" class="form-control text-end" step="0.01" min="0" max="100" required></div>
+          <div class="s6"><label class="form-label" for="tCess">Cess (%)</label><input type="number" id="tCess" name="cessRate" class="form-control text-end" step="0.01" min="0" max="100" value="0"></div>
+        </div>
+      </div>
+      <div class="panel-footer d-flex justify-content-end"><button type="submit" class="btn btn-primary"><i class="icon-plus"></i> Add rate</button></div>
+    </form>
   </div>
 </div>
-
 <%- include('../partials/layout-end') %>

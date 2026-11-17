@@ -4,7 +4,7 @@ import { requireBusiness } from "../../middleware/auth";
 
 export const hsnApiRouter = Router();
 
-hsnApiRouter.use(requireBusiness);
+hsnApiRouter.use("/api", requireBusiness);
 
 hsnApiRouter.get("/api/hsn/search", async (req, res) => {
   const q = (req.query.q as string) || "";

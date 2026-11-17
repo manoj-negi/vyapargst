@@ -211,3 +211,55 @@ describe("isIntraState", () => {
     expect(isIntraState("Uttar Pradesh", "Maharashtra")).toBe(false);
   });
 });
+
+describe("charges, discounts and inclusive pricing", () => {
+  const line = (over: Partial<Parameters<typeof calculateLineItem>[0]> = {}) =>
+    calculateLineItem({ quantity: 2, unitPrice: 500, priceType: "EXCLUSIVE", discountValue: 0, discountType: "FIXED", gstRate: 12, isIntraState: false, ...over });
+
+  it("taxes delivery charges at their own rate and adds them to taxable value", () => {
+    const totals = calculateInvoiceTotals({ lines: [line()], charges: { amount: 100, gstRate: 18 }, isIntraState: false, roundOffMode: "DISABLED" });
+    // goods 1000 @12% = 120 IGST; charges 100 @18% = 18 IGST
+    expect(totals.taxableAmount.toNumber()).toBe(1100);
+    expect(totals.igst.toNumber()).toBe(138);
+    expect(totals.charges.toNumber()).toBe(100);
+    expect(totals.chargesTax.toNumber()).toBe(18);
+    expect(totals.total.toNumber()).toBe(1238);
+    expect(totals.taxGroups.map((g) => g.gstRate.toNumber())).toEqual([12, 18]);
+  });
+
+  it("does not apply the invoice discount to charges", () => {
+    const totals = calculateInvoiceTotals({
+      lines: [line()],
+      invoiceDiscount: { value: 10, type: "PERCENTAGE" },
+      charges: { amount: 100, gstRate: 0 },
+      isIntraState: false,
+      roundOffMode: "DISABLED",
+    });
+    expect(totals.discount.toNumber()).toBe(100);
+    expect(totals.taxableAmount.toNumber()).toBe(1000); // 900 goods + 100 charges
+    expect(totals.total.toNumber()).toBe(1108); // 900 + 108 IGST + 100
+  });
+
+  it("header total always equals taxable + taxes + round-off", () => {
+    const lines = [line({ priceType: "INCLUSIVE", unitPrice: 333.33, quantity: 3, gstRate: 18, isIntraState: true }), line({ discountValue: 7.5, discountType: "PERCENTAGE", isIntraState: true })];
+    const t = calculateInvoiceTotals({ lines, invoiceDiscount: { value: 37, type: "FIXED" }, charges: { amount: 49.99, gstRate: 5 }, isIntraState: true, roundOffMode: "AUTOMATIC" });
+    expect(t.total.toFixed(2)).toBe(t.taxableAmount.plus(t.cgst).plus(t.sgst).plus(t.igst).plus(t.cess).plus(t.roundOff).toFixed(2));
+    expect(t.total.isInteger()).toBe(true);
+  });
+
+  it("rejects a line discount larger than the line", () => {
+    expect(() => line({ discountValue: 1001, discountType: "FIXED" })).toThrow(RangeError);
+    expect(() => line({ discountValue: 101, discountType: "PERCENTAGE" })).toThrow(RangeError);
+  });
+
+  it("rejects an invoice discount larger than the subtotal", () => {
+    expect(() => calculateInvoiceTotals({ lines: [line()], invoiceDiscount: { value: 1000.01, type: "FIXED" }, roundOffMode: "DISABLED" })).toThrow(RangeError);
+  });
+
+  it("inclusive price: tax is backed out, never added on top", () => {
+    const r = line({ priceType: "INCLUSIVE", unitPrice: 112, quantity: 1, gstRate: 12 });
+    expect(r.taxableValue.toNumber()).toBe(100);
+    expect(r.igst.toNumber()).toBe(12);
+    expect(r.total.toNumber()).toBe(112);
+  });
+});

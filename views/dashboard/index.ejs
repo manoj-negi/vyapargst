@@ -1,76 +1,157 @@
 <%- include('../partials/layout-start', { title: 'Dashboard', activeNav: 'dashboard' }) %>
+<%
+  var hour = new Date().getHours();
+  var greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  var firstName = (typeof userName !== 'undefined' && userName ? userName.split(' ')[0] : '');
+  var maxTrend = Math.max.apply(null, salesTrend.map(function (b) { return Math.abs(b.total); }).concat([0]));
+  var trendTotal = salesTrend.reduce(function (s, b) { return s + b.total; }, 0);
+  function shortInr(n) {
+    var a = Math.abs(n), sign = n < 0 ? '-' : '';
+    if (a >= 10000000) return sign + '₹' + (a / 10000000).toFixed(1).replace(/\.0$/, '') + 'Cr';
+    if (a >= 100000) return sign + '₹' + (a / 100000).toFixed(1).replace(/\.0$/, '') + 'L';
+    if (a >= 1000) return sign + '₹' + (a / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return sign + '₹' + Math.round(a);
+  }
+  var quick = [
+    ['/invoices/new', 'icon-file-text', 'Sale invoice', 'var(--indigo-600)'],
+    ['/payments/new?direction=IN', 'icon-hand-coins', 'Payment in', 'var(--teal-600)'],
+    ['/purchases/new', 'icon-shopping-cart', 'Purchase bill', 'var(--amber-600)'],
+    ['/payments/new?direction=OUT', 'icon-banknote', 'Payment out', 'var(--rose-600)'],
+    ['/estimates/new', 'icon-file-pen-line', 'Estimate', 'var(--sky-600)'],
+    ['/expenses/new', 'icon-wallet', 'Expense', 'var(--violet-500)'],
+    ['/products/new', 'icon-package-plus', 'Item', 'var(--indigo-600)'],
+    ['/customers/new', 'icon-user-plus', 'Party', 'var(--teal-600)']
+  ];
+%>
+<div class="page" data-list-key="/dashboard">
+  <section class="dash-hero no-print" aria-label="Summary">
+    <div>
+      <div class="eyebrow"><%= business.name %></div>
+      <h1><%= greeting %><%= firstName ? ', ' + firstName : '' %></h1>
+      <p>Here is where the business stands today.</p>
+    </div>
+    <div class="hero-side">
+      <div class="hero-figure">
+        <div class="label">Net sales this month</div>
+        <div class="value num"><%= inr(stats.monthSales) %></div>
+      </div>
+      <a href="/invoices/new" class="btn btn-glass"><i class="icon-plus"></i> New invoice</a>
+    </div>
+  </section>
 
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-4 col-lg">
-    <div class="stat-card">
-      <div class="stat-label">Today's Sales</div>
-      <div class="stat-value">₹<%= stats.todaySales.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></div>
-    </div>
+  <div class="kpi-grid kpi-six">
+    <a class="kpi tone-indigo" href="/invoices?from=<%= new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,10) %>">
+      <div class="kpi-top"><div><div class="kpi-label">Today's sales</div><div class="kpi-value"><%= inr(stats.todaySales) %></div></div><span class="kpi-icon"><i class="icon-receipt-indian-rupee"></i></span></div>
+      <div class="kpi-sub">Invoices dated today</div>
+    </a>
+    <a class="kpi tone-violet" href="/reports/sales">
+      <div class="kpi-top"><div><div class="kpi-label">Sales this month</div><div class="kpi-value"><%= inr(stats.monthSales) %></div></div><span class="kpi-icon"><i class="icon-trending-up"></i></span></div>
+      <div class="kpi-sub">Net of sale returns</div>
+    </a>
+    <a class="kpi tone-teal" href="/reports/receivables">
+      <div class="kpi-top"><div><div class="kpi-label">To receive</div><div class="kpi-value text-success"><%= inr(stats.outstanding) %></div></div><span class="kpi-icon"><i class="icon-arrow-down-left"></i></span></div>
+      <div class="kpi-sub">Owed by customers</div>
+    </a>
+    <a class="kpi tone-rose" href="/reports/payables">
+      <div class="kpi-top"><div><div class="kpi-label">To pay</div><div class="kpi-value text-danger"><%= inr(stats.toPay) %></div></div><span class="kpi-icon"><i class="icon-arrow-up-right"></i></span></div>
+      <div class="kpi-sub">Owed to suppliers</div>
+    </a>
+    <a class="kpi tone-amber" href="/reports/purchases">
+      <div class="kpi-top"><div><div class="kpi-label">Purchases this month</div><div class="kpi-value"><%= inr(stats.monthPurchases) %></div></div><span class="kpi-icon"><i class="icon-shopping-cart"></i></span></div>
+      <div class="kpi-sub">Purchase bills</div>
+    </a>
+    <a class="kpi tone-sky" href="/products?stockStatus=low">
+      <div class="kpi-top"><div><div class="kpi-label">Items</div><div class="kpi-value"><%= stats.totalItems %></div></div><span class="kpi-icon"><i class="icon-package"></i></span></div>
+      <div class="kpi-sub <%= stats.lowStock > 0 ? 'text-danger' : '' %>"><%= stats.lowStock %> at or below low-stock level</div>
+    </a>
   </div>
-  <div class="col-6 col-md-4 col-lg">
-    <div class="stat-card">
-      <div class="stat-label">This Month</div>
-      <div class="stat-value">₹<%= stats.monthSales.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></div>
-    </div>
-  </div>
-  <div class="col-6 col-md-4 col-lg">
-    <div class="stat-card">
-      <div class="stat-label">Outstanding</div>
-      <div class="stat-value text-danger">₹<%= stats.outstanding.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></div>
-    </div>
-  </div>
-  <div class="col-6 col-md-4 col-lg">
-    <div class="stat-card">
-      <div class="stat-label">Total Items</div>
-      <div class="stat-value"><%= stats.totalItems %></div>
-    </div>
-  </div>
-  <div class="col-6 col-md-4 col-lg">
-    <div class="stat-card">
-      <div class="stat-label">Low Stock</div>
-      <div class="stat-value <%= stats.lowStock > 0 ? 'text-danger' : '' %>"><%= stats.lowStock %></div>
-    </div>
-  </div>
-</div>
 
-<div class="d-flex gap-2 mb-4">
-  <a href="/invoices/new" class="btn btn-accent"><i class="icon-plus"></i> Add Sale</a>
-  <a href="/products/new" class="btn btn-outline-primary"><i class="icon-plus"></i> Add Item</a>
-  <a href="/customers/new" class="btn btn-outline-primary"><i class="icon-plus"></i> Add Customer</a>
-</div>
-
-<div class="card">
-  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
-    <h6 class="fw-bold mb-0">Recent Sales</h6>
-    <a href="/invoices" class="small">View all</a>
-  </div>
-  <div class="table-scroll">
-    <table class="table table-app mb-0">
-      <thead><tr><th>Invoice</th><th>Customer</th><th>Date</th><th>Amount</th><th>Payment Status</th></tr></thead>
-      <tbody>
-        <% if (recentInvoices.length === 0) { %>
-          <tr><td colspan="5">
-            <div class="empty-state">
-              <i class="icon-file-text"></i>
-              No sales yet. <a href="/invoices/new">Create your first invoice</a>.
-            </div>
-          </td></tr>
-        <% } %>
-        <% recentInvoices.forEach(function(inv) { %>
-          <tr>
-            <td><a href="/invoices/<%= inv.id %>" class="fw-semibold"><%= inv.invoiceNo %></a></td>
-            <td><%= inv.customer.name %></td>
-            <td><%= new Date(inv.invoiceDate).toLocaleDateString('en-IN') %></td>
-            <td>₹<%= Number(inv.total).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) %></td>
-            <td>
-              <% var cls = inv.paymentStatus === 'PAID' ? 'status-paid' : (inv.paymentStatus === 'PARTIALLY_PAID' ? 'status-partial' : 'status-unpaid'); %>
-              <span class="status-badge <%= cls %>"><%= inv.paymentStatus.replace('_',' ') %></span>
-            </td>
-          </tr>
+  <div class="panel mb-3">
+    <div class="panel-header"><h2 class="panel-title"><span class="ico"><i class="icon-zap"></i></span> Quick actions</h2><span class="small text-muted kbd-hint">Alt+I invoice · Alt+R payment in · Alt+P purchase</span></div>
+    <div class="panel-body">
+      <div class="quick-actions">
+        <% quick.forEach(function (q) { %>
+          <a href="<%= q[0] %>" class="quick-action" style="--qa: <%= q[3] %>"><span class="qa-icon"><i class="<%= q[1] %>"></i></span><%= q[2] %></a>
         <% }) %>
-      </tbody>
-    </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-grid gap-3 dash-grid">
+    <div class="side-stack">
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title"><span class="ico"><i class="icon-chart-column"></i></span> Net sales, last 6 months</h2>
+          <span class="small text-muted">Total <strong class="text-body num"><%= inr(trendTotal) %></strong></span>
+        </div>
+        <div class="panel-body">
+          <% if (maxTrend === 0) { %>
+            <div class="empty-state py-4"><i class="icon-chart-column"></i>No sales in the last six months yet.</div>
+          <% } else { %>
+          <div class="trend" style="--bars: <%= salesTrend.length %>" role="img" aria-label="Net sales by month: <%= salesTrend.map(function (b) { return b.label + ' ' + inr(b.total); }).join(', ') %>">
+            <% salesTrend.forEach(function (b, i) { var h = maxTrend ? Math.max(2, Math.round(Math.max(b.total, 0) / maxTrend * 100)) : 2; %>
+              <div class="trend-bar <%= i === salesTrend.length - 1 ? 'current' : '' %>" title="<%= b.label %> <%= b.year %>: <%= inr(b.total) %> from <%= b.count %> invoice<%= b.count === 1 ? '' : 's' %>">
+                <span class="trend-value"><%= shortInr(b.total) %></span>
+                <span class="trend-col" style="height: <%= h %>%"></span>
+                <span class="trend-label"><%= b.label %></span>
+              </div>
+            <% }) %>
+          </div>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title"><span class="ico"><i class="icon-file-text"></i></span> Recent sales</h2>
+          <a href="/invoices" class="btn btn-sm btn-tertiary">View all <i class="icon-arrow-right"></i></a>
+        </div>
+        <div class="table-scroll">
+          <table class="table table-app">
+            <thead><tr><th>Invoice</th><th>Customer</th><th>Date</th><th class="num">Amount</th><th>Status</th></tr></thead>
+            <tbody>
+              <% if (recentInvoices.length === 0) { %>
+                <tr><td colspan="5"><div class="empty-state"><i class="icon-file-text"></i><div class="title">No sales yet</div><a href="/invoices/new" class="btn btn-sm btn-primary"><i class="icon-plus"></i> Create your first invoice</a></div></td></tr>
+              <% } %>
+              <% recentInvoices.forEach(function(inv) { %>
+                <tr>
+                  <td><a href="/invoices/<%= inv.id %>" class="cell-main"><%= inv.invoiceNo %></a></td>
+                  <td><div class="cell-truncate" title="<%= inv.customer.name %>"><%= inv.customer.name %></div><% if (divisionText(inv)) { %><div class="cell-sub"><%= divisionText(inv) %></div><% } %></td>
+                  <td class="nowrap"><%= fdate(inv.invoiceDate) %></td>
+                  <td class="num"><%= inr(inv.total) %></td>
+                  <td><span class="status-badge <%= paymentStatusClass(inv.paymentStatus) %>"><%= paymentStatusLabel(inv.paymentStatus) %></span></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title"><span class="ico amber"><i class="icon-triangle-alert"></i></span> Low stock</h2>
+        <a href="/products?stockStatus=low" class="btn btn-sm btn-tertiary">View all <i class="icon-arrow-right"></i></a>
+      </div>
+      <% if (lowStockItems.length === 0) { %>
+        <div class="empty-state"><i class="icon-circle-check"></i>All items are above their low-stock level.</div>
+      <% } else { %>
+        <div class="table-scroll">
+        <table class="table table-app" style="table-layout:fixed">
+          <thead><tr><th>Item</th><th class="num" style="width:76px">Stock</th><th class="num" style="width:80px">Alert at</th></tr></thead>
+          <tbody>
+            <% lowStockItems.forEach(function(p) { %>
+              <tr>
+                <td><a href="/products/<%= p.id %>/edit" class="cell-truncate d-block cell-main" title="<%= p.name %>"><%= p.name %></a></td>
+                <td class="num fw-semibold <%= Number(p.currentStock) <= 0 ? 'text-danger' : 'text-warning' %>"><%= qty(p.currentStock) %></td>
+                <td class="num muted"><%= qty(p.minStock) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        </div>
+      <% } %>
+    </div>
   </div>
 </div>
-
 <%- include('../partials/layout-end') %>

@@ -2,6 +2,11 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { AppError } from "../middleware/errorHandler";
+import { env } from "../config/env";
+import { MAX_DOCUMENT_NUMBER_LENGTH, sampleDocumentNumber } from "../services/invoice/numbering";
+import { writeAudit } from "../services/audit/audit";
+import { fieldErrorsFrom } from "../lib/viewHelpers";
+import { createBackup, listBackups, verifyBackup } from "../services/backup/backup";
 
 const taxSchema = z.object({
   name: z.string().trim().min(1),
@@ -20,7 +25,16 @@ export async function listTaxMaster(req: Request, res: Response) {
 
 export async function createTaxMaster(req: Request, res: Response) {
   const business = res.locals.business;
-  const parsed = taxSchema.parse(req.body);
+  const result = taxSchema.safeParse(req.body);
+  if (!result.success) {
+    req.session.flash = { type: "danger", message: result.error.errors.map((e) => e.message).join("; ") };
+    return res.redirect("/settings/tax-master");
+  }
+  const parsed = result.data;
+  if (await prisma.taxMaster.findFirst({ where: { businessId: business.id, rate: parsed.rate } })) {
+    req.session.flash = { type: "danger", message: `A ${parsed.rate}% tax rate already exists.` };
+    return res.redirect("/settings/tax-master");
+  }
   const half = parsed.rate / 2;
 
   await prisma.taxMaster.create({
@@ -112,7 +126,12 @@ export async function listHsnMaster(req: Request, res: Response) {
 
 export async function createHsnMaster(req: Request, res: Response) {
   const business = res.locals.business;
-  const parsed = hsnSchema.parse(req.body);
+  const result = hsnSchema.safeParse(req.body);
+  if (!result.success) {
+    req.session.flash = { type: "danger", message: result.error.errors.map((e) => e.message).join("; ") };
+    return res.redirect(hsnListUrl(req.body));
+  }
+  const parsed = result.data;
 
   await prisma.hSNMaster.create({
     data: {
@@ -131,7 +150,12 @@ export async function createHsnMaster(req: Request, res: Response) {
 export async function updateHsnMaster(req: Request, res: Response) {
   const business = res.locals.business;
   const hsn = await findOwnHsn(business.id, req.params.id);
-  const parsed = hsnSchema.parse(req.body);
+  const result = hsnSchema.safeParse(req.body);
+  if (!result.success) {
+    req.session.flash = { type: "danger", message: result.error.errors.map((e) => e.message).join("; ") };
+    return res.redirect(hsnListUrl(req.body));
+  }
+  const parsed = result.data;
 
   await prisma.hSNMaster.update({
     where: { id: hsn.id },
@@ -164,4 +188,90 @@ export async function toggleHsnMaster(req: Request, res: Response) {
 
   await prisma.hSNMaster.update({ where: { id: hsn.id }, data: { isActive: !hsn.isActive } });
   res.redirect(hsnListUrl(req.body));
+}
+
+const prefixField = (label: string) =>
+  z
+    .string()
+    .trim()
+    .min(1, `${label} prefix is required`)
+    .max(12, `${label} prefix can be at most 12 characters`)
+    .regex(/^[A-Za-z0-9/-]+$/, `${label} prefix may only use letters, numbers, "-" and "/"`);
+
+const documentSettingsSchema = z
+  .object({
+    invoicePrefix: prefixField("Invoice"),
+    estimatePrefix: prefixField("Estimate"),
+    creditNotePrefix: prefixField("Credit note"),
+    purchasePrefix: prefixField("Purchase bill"),
+    debitNotePrefix: prefixField("Debit note"),
+    paymentInPrefix: prefixField("Payment-in"),
+    paymentOutPrefix: prefixField("Payment-out"),
+    expensePrefix: prefixField("Expense"),
+    invoiceStartNumber: z.coerce.number().int().min(1).max(999999),
+    financialYearFormat: z.preprocess((v) => v === "on" || v === "true", z.boolean()),
+    roundOffMode: z.enum(["AUTOMATIC", "MANUAL", "DISABLED"]),
+    negativeStockPolicy: z.enum(["PREVENT", "ALLOW_WITH_WARNING"]),
+  })
+  .superRefine((data, ctx) => {
+    // GST Rule 46(b): tax invoice (and credit/debit note) numbers may not exceed 16 characters.
+    for (const key of ["invoicePrefix", "creditNotePrefix", "debitNotePrefix"] as const) {
+      const sample = sampleDocumentNumber(data[key], data.financialYearFormat);
+      if (sample.length > MAX_DOCUMENT_NUMBER_LENGTH) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `Numbers like "${sample}" are ${sample.length} characters; GST allows at most ${MAX_DOCUMENT_NUMBER_LENGTH}. Use a shorter prefix.`,
+        });
+      }
+    }
+  });
+
+export async function showDocumentSettings(req: Request, res: Response) {
+  const business = res.locals.business;
+  const settings = business.settings ?? (await prisma.businessSettings.create({ data: { businessId: business.id } }));
+  const sequences = await prisma.invoiceSequence.findMany({ where: { businessId: business.id }, orderBy: [{ prefix: "asc" }, { financialYear: "asc" }] });
+  res.render("settings/documents", { title: "Numbering & Billing", activeNav: "doc-settings", settings, sequences, errors: null, sampleDocumentNumber });
+}
+
+export async function saveDocumentSettings(req: Request, res: Response) {
+  const business = res.locals.business;
+  const parsed = documentSettingsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.locals.fieldErrors = fieldErrorsFrom(parsed.error);
+    const sequences = await prisma.invoiceSequence.findMany({ where: { businessId: business.id } });
+    return res.status(422).render("settings/documents", {
+      title: "Numbering & Billing",
+      activeNav: "doc-settings",
+      settings: { ...business.settings, ...req.body, financialYearFormat: req.body.financialYearFormat === "on" },
+      sequences,
+      errors: parsed.error.errors.map((e) => e.message),
+      sampleDocumentNumber,
+    });
+  }
+  await prisma.$transaction(async (tx) => {
+    await tx.businessSettings.upsert({
+      where: { businessId: business.id },
+      create: { businessId: business.id, ...parsed.data },
+      update: parsed.data,
+    });
+    await writeAudit(tx, { businessId: business.id, userId: req.session.userId, entity: "SETTINGS", entityId: business.id, action: "UPDATE", detail: parsed.data });
+  });
+  req.session.flash = { type: "success", message: "Numbering & billing settings saved." };
+  res.redirect("/settings/documents");
+}
+
+export async function showBackups(_req: Request, res: Response) {
+  res.render("settings/backup", { title: "Backup", activeNav: "backup", backups: await listBackups(), backupDir: env.backupDir });
+}
+
+export async function createBackupNow(req: Request, res: Response) {
+  try {
+    const { dir } = await createBackup("manual");
+    await verifyBackup(dir);
+    req.session.flash = { type: "success", message: `Backup created and verified: ${dir}` };
+  } catch (err) {
+    req.session.flash = { type: "danger", message: `Backup failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+  res.redirect("/settings/backup");
 }

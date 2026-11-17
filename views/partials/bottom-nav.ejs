@@ -1,0 +1,16 @@
+<%
+  // Phone navigation (hidden from 992px up, where the sidebar is shown). "More" opens the full sidebar drawer.
+  var p = typeof currentPath !== 'undefined' ? currentPath : '';
+  var tabs = [
+    ['/dashboard', 'icon-layout-dashboard', 'Dashboard', /^\/(dashboard)?$/],
+    ['/invoices', 'icon-file-text', 'Sales', /^\/(invoices|estimates|credit-notes)(\/|$)/],
+    ['/products', 'icon-package', 'Items', /^\/products(\/|$)/],
+    ['/customers', 'icon-users', 'Parties', /^\/customers(\/|$)/],
+  ];
+%>
+<nav class="bottom-nav no-print" aria-label="Main">
+  <% tabs.forEach(function (t) { var on = t[3].test(p); %>
+    <a href="<%= t[0] %>" class="bottom-nav-item<%= on ? ' active' : '' %>"<%- on ? ' aria-current="page"' : '' %>><i class="<%= t[1] %>" aria-hidden="true"></i><span><%= t[2] %></span></a>
+  <% }) %>
+  <button type="button" class="bottom-nav-item" data-open-drawer aria-controls="sidebar"><i class="icon-menu" aria-hidden="true"></i><span>More</span></button>
+</nav>

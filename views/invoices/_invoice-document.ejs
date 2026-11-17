@@ -62,14 +62,26 @@
   .invoice-doc .totals .sep { width: 16px; text-align: center; }
 
   .invoice-doc .footer { border-top: 1px solid #3b4253; }
+  /* The bank details and signatory box stay together on one page */
+  .invoice-doc .footer, .invoice-doc .footer tr { break-inside: avoid; page-break-inside: avoid; }
+  .invoice-doc .signatory-stamp { display: block; max-width: calc(100% - 8px); max-height: 38mm; height: auto; margin: 4px auto 0; object-fit: contain; image-rendering: auto; }
   .invoice-doc .sign-box { width: 140px; height: 50px; border: 1px solid #9ca3af; margin: 24px auto 4px; }
 </style>
 
-<% var intra = invoice.taxType === 'INTRA_STATE'; %>
+<%
+  var intra = invoice.taxType === 'INTRA_STATE';
+  var docCfg = typeof config !== 'undefined' && config ? config : { docType: 'SALE_INVOICE', title: 'Tax Invoice', side: 'SALE', settlementDirection: 'IN' };
+  var docTitle = docCfg.docType === 'SALE_INVOICE' && business.gstRegistered === false ? 'Bill of Supply' : docCfg.title;
+  var isPurchaseDoc = docCfg.side === 'PURCHASE';
+  var showSettlement = !!docCfg.settlementDirection;
+  // Printed only when it adds something: not when the billing address already contains it (e.g. just the city)
+  var addrKey = function (a) { return String(a || '').toLowerCase().replace(/[\s,.]+/g, ' ').trim(); };
+  var deliveryAddress = customer.shippingAddress && addrKey(customer.shippingAddress) && addrKey(customer.billingAddress).indexOf(addrKey(customer.shippingAddress)) === -1 ? customer.shippingAddress : null;
+%>
 <div class="invoice-doc">
 <table class="doc-layout">
   <thead><tr><td>
-  <div class="doc-title">Tax Invoice</div>
+  <div class="doc-title"><%= docTitle %><% if (invoice.status === 'CANCELLED') { %> <span style="color:#b91c1c;">(CANCELLED)</span><% } %></div>
 
   <div class="biz-frame">
     <div class="biz">
@@ -92,8 +104,8 @@
 
     <table class="meta">
       <tr class="label-row">
-        <td style="width:50%; border-left:none;">Bill To:</td>
-        <td colspan="2" style="border-right:none;">Invoice Details:</td>
+        <td style="width:50%; border-left:none;"><%= isPurchaseDoc ? 'Bill From (Supplier):' : 'Bill To:' %></td>
+        <td colspan="2" style="border-right:none;"><%= docCfg.title %> Details:</td>
       </tr>
       <tr>
         <td style="border-left:none; border-bottom:none;">
@@ -106,17 +118,26 @@
             <div>State: <strong><%= stateWithCode(customer.state) %></strong></div>
             <% if (customer.gstin) { %><div>GSTIN Number:<br><strong><%= customer.gstin %></strong></div><% } %>
           </div>
+          <% if (deliveryAddress) { %><div class="muted" style="margin-top:6px;">Delivery Address: <span style="white-space:pre-line;"><%= deliveryAddress %></span></div><% } %>
         </td>
-        <td style="width:25%; border-bottom:none;">
+        <%# Section and Department print separately, each only when filled; with neither, the details use both columns %>
+        <% var divisionRows = typeof division !== 'undefined' ? division : []; %>
+        <td style="width:<%= divisionRows.length ? '25%' : '50%' %>; border-bottom:none;<%= divisionRows.length ? '' : ' border-right:none;' %>"<%- divisionRows.length ? '' : ' colspan="2"' %>>
           <div>No: <strong><%= invoice.invoiceNo %></strong></div>
           <div>Date: <strong><%= formatDate(invoice.invoiceDate) %></strong></div>
-          <% if (invoice.dueDate) { %><div>Due Date: <strong><%= formatDate(invoice.dueDate) %></strong></div><% } %>
+          <% if (invoice.dueDate) { %><div><%= docCfg.docType === 'ESTIMATE' ? 'Valid Until' : 'Due Date' %>: <strong><%= formatDate(invoice.dueDate) %></strong></div><% } %>
+          <% if (invoice.partyInvoiceNo) { %><div>Supplier Bill No: <strong><%= invoice.partyInvoiceNo %></strong><%= invoice.partyInvoiceDate ? ' dt. ' + formatDate(invoice.partyInvoiceDate) : '' %></div><% } %>
+          <% if (invoice.originalDoc) { %><div>Against <%= isPurchaseDoc ? 'Bill' : 'Invoice' %>: <strong><%= invoice.originalDoc.invoiceNo %></strong> dt. <%= formatDate(invoice.originalDoc.invoiceDate) %></div><% } %>
           <div>Place of Supply: <strong style="white-space:nowrap;"><%= stateWithCode(invoice.placeOfSupply) %></strong></div>
+          <% if (docCfg.docType !== 'ESTIMATE') { %><div>Reverse Charge: <strong>No</strong></div><% } %>
         </td>
+        <% if (divisionRows.length) { %>
         <td style="width:25%; border-right:none; border-bottom:none;">
-          <% if (customer.section) { %><div>SECTION: <strong><%= customer.section %></strong></div><% } %>
-          <% if (customer.department) { %><div>DEPARTMENT: <strong><%= customer.department %></strong></div><% } %>
+          <% divisionRows.forEach(function (d) { %>
+            <div><% if (d.label) { %><%= d.label %>: <% } %><strong><%= d.value %></strong></div>
+          <% }) %>
         </td>
+        <% } %>
       </tr>
     </table>
   <div class="items-wrapper">
@@ -230,16 +251,23 @@
         <table class="totals">
           <tr><td style="border-top:none;">Sub Total</td><td class="sep" style="border-top:none;">:</td><td class="num" style="border-top:none;">₹ <%= formatMoney(itemTotals.amount) %></td></tr>
           <% if (Number(invoice.discount) > 0) { %>
-            <tr><td>Discount</td><td class="sep">:</td><td class="num">- ₹ <%= formatMoney(invoice.discount) %></td></tr>
+            <%# Discount reduces the taxable value, so GST falls too; show the full reduction so the lines add up to Total. %>
+            <% var effectiveDiscount = itemTotals.amount + Number(invoice.chargesAmount) + chargesTax + Number(invoice.roundOff) - Number(invoice.total); %>
+            <tr><td>Discount<%= Math.abs(effectiveDiscount - Number(invoice.discount)) > 0.009 ? ' (incl. GST)' : '' %></td><td class="sep">:</td><td class="num">- ₹ <%= formatMoney(effectiveDiscount) %></td></tr>
+          <% } %>
+          <% if (Number(invoice.chargesAmount) > 0) { %>
+            <tr><td><%= invoice.chargesLabel || 'Charges' %> (incl. GST)</td><td class="sep">:</td><td class="num">+ ₹ <%= formatMoney(Number(invoice.chargesAmount) + chargesTax) %></td></tr>
           <% } %>
           <% if (Math.abs(Number(invoice.roundOff)) > 0.001) { %>
             <tr><td>Round Off</td><td class="sep">:</td><td class="num"><%= Number(invoice.roundOff) > 0 ? '+' : '-' %> ₹ <%= formatMoney(Math.abs(Number(invoice.roundOff))) %></td></tr>
           <% } %>
           <tr style="font-weight:700;"><td>Total</td><td class="sep">:</td><td class="num">₹ <%= formatMoney(invoice.total) %></td></tr>
-          <tr><td colspan="3" class="shade">Invoice Amount In Words :</td></tr>
+          <tr><td colspan="3" class="shade"><%= docCfg.title %> Amount In Words :</td></tr>
           <tr><td colspan="3"><%= amountInWords %></td></tr>
-          <tr><td>Received</td><td class="sep">:</td><td class="num">₹ <%= formatMoney(invoice.receivedAmount) %></td></tr>
+          <% if (showSettlement) { %>
+          <tr><td><%= docCfg.settlementDirection === 'OUT' ? 'Paid / Adjusted' : 'Received / Adjusted' %></td><td class="sep">:</td><td class="num">₹ <%= formatMoney(invoice.receivedAmount) %></td></tr>
           <tr><td style="border-bottom:none;">Balance</td><td class="sep" style="border-bottom:none;">:</td><td class="num" style="border-bottom:none;">₹ <%= formatMoney(invoice.balance) %></td></tr>
+          <% } %>
           <%
             var totalSavings = 0;
             if (invoice.items) { 
@@ -251,12 +279,12 @@
                 }
               }); 
             }
-            totalSavings += Number(invoice.discount || 0);
+            if (Number(invoice.discount) > 0) totalSavings += itemTotals.amount + Number(invoice.chargesAmount) + chargesTax + Number(invoice.roundOff) - Number(invoice.total);
             if (Number(invoice.roundOff) < 0) {
               totalSavings += Math.abs(Number(invoice.roundOff));
             }
           %>
-          <% if (totalSavings > 0) { %>
+          <% if (totalSavings > 0 && !isPurchaseDoc) { %>
           <tr style="font-weight: 600;">
             <td style="border-bottom:none;">Total You Saved</td><td class="sep" style="border-bottom:none;">:</td><td class="num" style="border-bottom:none;">₹ <%= formatMoney(totalSavings) %></td>
           </tr>
@@ -266,10 +294,12 @@
     </tr>
   </table>
 
+  <%# Stamp & signature image (Business Profile). It already reads "For <business>", so the printed heading can be left out. Text-only when none is configured. %>
+  <% var stampImg = typeof stamp !== 'undefined' && stamp && stamp.src && !isPurchaseDoc ? stamp : null; %>
   <table class="footer">
     <tr>
       <td class="shade" style="width:50%;">Bank Details:</td>
-      <td class="shade">For <%= business.name.toUpperCase() %>:</td>
+      <td class="shade"><%= stampImg && stampImg.hidesHeading ? '' : 'For ' + business.name.toUpperCase() + ':' %></td>
     </tr>
     <tr>
       <td style="height:100px; line-height: 1.6;">
@@ -277,10 +307,21 @@
         <% if (business.bankAccountNo) { %><div>Account No.: <strong><%= business.bankAccountNo %></strong></div><% } %>
         <% if (business.bankIfsc) { %><div>IFSC code: <strong><%= business.bankIfsc %></strong></div><% } %>
         <% if (business.bankAccountHolder) { %><div>Account Holder's Name: <strong><%= business.bankAccountHolder %></strong></div><% } %>
+        <% if (business.upiId) { %><div>UPI: <strong><%= business.upiId %></strong><%= business.upiName ? ' (' + business.upiName + ')' : '' %></div><% } %>
       </td>
-      <td class="center">
+      <td class="center signatory-cell" style="vertical-align:bottom; text-align:center;">
+        <% if (stampImg) { %><img class="signatory-stamp" src="<%= stampImg.src %>" alt="Stamp and signature" style="width:<%= stampImg.widthMm %>mm;"><% } %>
+        <div style="margin-top:4px;">Authorised Signatory</div>
       </td>
     </tr>
+    <% if (invoice.notes || invoice.terms) { %>
+    <tr>
+      <td colspan="2" style="line-height:1.5;">
+        <% if (invoice.notes) { %><div><strong>Notes:</strong> <span style="white-space:pre-line;"><%= invoice.notes %></span></div><% } %>
+        <% if (invoice.terms) { %><div><strong>Terms &amp; Conditions:</strong> <span style="white-space:pre-line;"><%= invoice.terms %></span></div><% } %>
+      </td>
+    </tr>
+    <% } %>
   </table>
   </div>
   </div>

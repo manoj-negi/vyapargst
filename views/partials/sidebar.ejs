@@ -1,63 +1,62 @@
-<aside class="sidebar" id="sidebar">
+<%
+  var biz = typeof business !== 'undefined' && business ? business : null;
+  function link(href, nav, icon, label) {
+    var active = activeNav === nav;
+    return '<a href="' + href + '" class="nav-link' + (active ? ' active' : '') + '"' + (active ? ' aria-current="page"' : '') + ' data-nav-tip="' + label + '"><span class="nav-icon" aria-hidden="true"><i class="' + icon + '"></i></span><span class="label">' + label + '</span></a>';
+  }
+%>
+<aside class="sidebar no-print" id="sidebar" aria-label="Main navigation">
   <div class="sidebar-brand">
-    <% if (typeof business !=='undefined' && business && business.logoPath) { %>
-      <img src="<%= business.logoPath %>" alt="Logo" class="sidebar-logo" />
-      <% } else { %>
-        <div class="sidebar-logo-placeholder"><i class="icon-receipt"></i></div>
-        <% } %>
-          <span class="sidebar-brand-name">
-            <%= typeof business !=='undefined' && business ? business.name : 'The City Cart' %>
-          </span>
-          <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Collapse sidebar">
-            <i class="icon-chevrons-left"></i>
-          </button>
+    <% if (biz && biz.logoPath) { %>
+      <img src="<%= biz.logoPath %>" alt="" class="sidebar-logo" />
+    <% } else { %>
+      <div class="sidebar-logo-placeholder"><i class="icon-receipt"></i></div>
+    <% } %>
+    <span class="sidebar-brand-text">
+      <span class="sidebar-brand-name" title="<%= biz ? biz.name : 'The City Cart' %>"><%= biz ? biz.name : 'The City Cart' %></span>
+      <span class="sidebar-brand-sub">Billing &amp; Inventory</span>
+    </span>
+    <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Collapse sidebar" title="Collapse sidebar">
+      <i class="icon-chevrons-left"></i>
+    </button>
   </div>
 
   <nav class="sidebar-nav">
-    <a href="/dashboard" class="nav-link <%= activeNav === 'dashboard' ? 'active' : '' %>">
-      <i class="icon-house"></i><span>Home</span>
-    </a>
-
-    <div class="nav-group-label">Parties</div>
-    <a href="/customers" class="nav-link <%= activeNav === 'customers' ? 'active' : '' %>">
-      <i class="icon-users"></i><span>Customers</span>
-    </a>
-
-    <div class="nav-group-label">Items</div>
-    <a href="/products" class="nav-link <%= activeNav === 'products' ? 'active' : '' %>">
-      <i class="icon-package"></i><span>Products</span>
-    </a>
+    <%- link('/dashboard', 'dashboard', 'icon-layout-dashboard', 'Dashboard') %>
 
     <div class="nav-group-label">Sale</div>
-    <a href="/invoices" class="nav-link <%= activeNav === 'invoices' ? 'active' : '' %>">
-      <i class="icon-file-text"></i><span>Sale Invoices</span>
-    </a>
+    <%- link('/invoices', 'invoices', 'icon-file-text', 'Sale Invoices') %>
+    <%- link('/estimates', 'estimates', 'icon-file-pen-line', 'Estimates') %>
+    <%- link('/payments?direction=IN', 'payment-in', 'icon-hand-coins', 'Payment In') %>
+    <%- link('/credit-notes', 'credit-notes', 'icon-undo-2', 'Sale Returns') %>
+
+    <div class="nav-group-label">Purchase</div>
+    <%- link('/purchases', 'purchases', 'icon-shopping-cart', 'Purchase Bills') %>
+    <%- link('/payments?direction=OUT', 'payment-out', 'icon-banknote', 'Payment Out') %>
+    <%- link('/debit-notes', 'debit-notes', 'icon-redo-2', 'Purchase Returns') %>
+    <%- link('/expenses', 'expenses', 'icon-wallet', 'Expenses') %>
+
+    <div class="nav-group-label">Masters</div>
+    <%- link('/customers?type=customer', 'customers', 'icon-users', 'Customers') %>
+    <%- link('/customers?type=supplier', 'suppliers', 'icon-truck', 'Suppliers') %>
+    <%- link('/products', 'products', 'icon-package', 'Items') %>
+
+    <div class="nav-group-label">Insights</div>
+    <%- link('/reports', 'reports', 'icon-chart-column', 'Reports') %>
 
     <div class="nav-group-label">Settings</div>
-    <a href="/settings/tax-master" class="nav-link <%= activeNav === 'tax-master' ? 'active' : '' %>">
-      <i class="icon-percent"></i><span>Tax Master</span>
-    </a>
-    <a href="/settings/hsn-master" class="nav-link <%= activeNav === 'hsn-master' ? 'active' : '' %>">
-      <i class="icon-list-tree"></i><span>HSN Master</span>
-    </a>
-    <a href="/business/setup" class="nav-link <%= activeNav === 'business' ? 'active' : '' %>">
-      <i class="icon-building-2"></i><span>Business Profile</span>
-    </a>
+    <%- link('/business/setup', 'business', 'icon-building-2', 'Business Profile') %>
+    <%- link('/settings/documents', 'doc-settings', 'icon-hash', 'Numbering & Billing') %>
+    <%- link('/settings/tax-master', 'tax-master', 'icon-percent', 'Tax Rates') %>
+    <%- link('/settings/hsn-master', 'hsn-master', 'icon-list-tree', 'HSN Codes') %>
+    <%- link('/settings/backup', 'backup', 'icon-database-backup', 'Backup') %>
   </nav>
 
   <div class="sidebar-footer">
-    <div class="sidebar-footer-business">
-      <i class="icon-building"></i>
-      <span>
-        <%= typeof business !=='undefined' && business ? business.name : 'No business' %>
-      </span>
-    </div>
-    <form action="/logout" method="POST" class="sidebar-footer-user">
-      <i class="icon-user"></i>
-      <span>
-        <%= typeof userName !=='undefined' ? userName : '' %>
-      </span>
-      <button type="submit" class="btn-logout" title="Log out"><i class="icon-log-out"></i> <span>Logout</span></button>
+    <form action="/logout" method="POST" class="sidebar-footer-user" data-no-loading>
+      <span class="avatar" aria-hidden="true"><%= initials(typeof userName !== 'undefined' ? userName : '') || '?' %></span>
+      <span class="who"><strong title="<%= typeof userName !== 'undefined' ? userName : '' %>"><%= typeof userName !== 'undefined' ? userName : '' %></strong><span>Signed in</span></span>
+      <button type="submit" class="btn-logout" title="Log out" aria-label="Log out"><i class="icon-log-out"></i></button>
     </form>
   </div>
 </aside>

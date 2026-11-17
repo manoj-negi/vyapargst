@@ -1,0 +1,52 @@
+<%- include('../partials/layout-start', { title: title, activeNav: activeNav }) %>
+<% var anyFilter = filters.from || filters.to || filters.categoryId || filters.status; %>
+<div class="page" data-list-key="/expenses">
+  <%- include('../partials/page-header', { title: 'Expenses', subtitle: 'Rent, salaries, utilities and other running costs.', actions: '<a href="/expenses/new" class="btn btn-primary"><i class="icon-plus"></i> Add expense</a>' }) %>
+  <div class="kpi-grid"><div class="kpi"><div class="kpi-label">Total (in list)</div><div class="kpi-value text-danger"><%= inr(total) %></div><div class="kpi-sub"><%= expenses.filter(function(e){ return e.status === 'ACTIVE'; }).length %> active</div></div></div>
+  <div class="panel">
+    <form method="GET" action="/expenses" class="filter-bar" role="search">
+      <div class="f f-date"><label class="form-label" for="ef">From</label><input type="date" id="ef" name="from" class="form-control form-control-sm" value="<%= filters.from %>"></div>
+      <div class="f f-date"><label class="form-label" for="et">To</label><input type="date" id="et" name="to" class="form-control form-control-sm" value="<%= filters.to %>"></div>
+      <div class="f f-select-lg"><label class="form-label" for="ec">Category</label>
+        <select id="ec" name="categoryId" class="form-select form-select-sm"><option value="">All</option>
+          <% categories.forEach(function(c) { %><option value="<%= c.id %>" <%= filters.categoryId === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        </select></div>
+      <div class="f f-select"><label class="form-label" for="es">Show</label>
+        <select id="es" name="status" class="form-select form-select-sm">
+          <option value="">Active</option>
+          <option value="CANCELLED" <%= filters.status === 'CANCELLED' ? 'selected' : '' %>>Cancelled</option>
+          <option value="ALL" <%= filters.status === 'ALL' ? 'selected' : '' %>>All</option>
+        </select></div>
+      <div class="f-actions">
+        <% if (anyFilter) { %><a href="/expenses" class="btn btn-sm btn-outline-secondary">Clear</a><% } %>
+        <button class="btn btn-sm btn-primary"><i class="icon-filter"></i> Apply</button>
+      </div>
+    </form>
+    <div class="table-scroll sticky">
+      <table class="table table-app" data-sortable data-page-size="50">
+        <thead><tr><th data-sort="date" style="width:110px">Date</th><th data-sort="text" style="width:120px">Number</th><th data-sort="text" style="width:170px">Category</th><th data-sort="text">Paid to / note</th><th style="width:90px">Mode</th><th data-sort="num" class="num" style="width:130px">Amount</th><th style="width:60px"></th></tr></thead>
+        <tbody>
+          <% if (expenses.length === 0) { %><tr data-static><td colspan="7"><div class="empty-state"><i class="icon-wallet"></i><div class="title">No expenses found</div><a href="/expenses/new" class="btn btn-sm btn-primary"><i class="icon-plus"></i> Add expense</a></div></td></tr><% } %>
+          <% expenses.forEach(function(e) { var cancelled = e.status === 'CANCELLED'; %>
+            <tr class="<%= cancelled ? 'row-muted' : '' %>">
+              <td class="nowrap" data-sort-value="<%= new Date(e.date).toISOString() %>"><%= fdate(e.date) %></td>
+              <td><span class="cell-main"><%= e.expenseNo %></span><% if (cancelled) { %><div class="cell-sub" title="<%= e.cancelReason || '' %>">Cancelled<%= e.cancelReason ? ': ' + e.cancelReason : '' %></div><% } %></td>
+              <td><%= e.category.name %></td>
+              <td><div class="cell-truncate" title="<%= [e.paidTo, e.note].filter(Boolean).join(' · ') %>"><%= e.paidTo || '' %><% if (e.note) { %><span class="cell-sub"><%= e.paidTo ? ' · ' : '' %><%= e.note %></span><% } %><%= !e.paidTo && !e.note ? '—' : '' %></div></td>
+              <td><%= modeLabel(e.mode) %></td>
+              <td class="num fw-semibold"><%= inr(e.amount) %></td>
+              <td class="text-end">
+                <% if (!cancelled) { %>
+                <form method="POST" action="/expenses/<%= e.id %>/cancel" class="m-0" data-confirm="Cancel expense <%= e.expenseNo %> (<%= inr(e.amount) %>)? It stays on record as cancelled." data-confirm-title="Cancel expense" data-confirm-label="Cancel expense" data-confirm-cancel="Keep expense" data-confirm-busy="Cancelling…" data-confirm-reason="reason">
+                  <button class="btn btn-sm btn-outline-danger btn-icon" title="Cancel <%= e.expenseNo %>" aria-label="Cancel <%= e.expenseNo %>"><i class="icon-ban"></i></button>
+                </form>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<%- include('../partials/layout-end') %>

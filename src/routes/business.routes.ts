@@ -9,6 +9,6 @@ businessRouter.get("/business/setup", requireAuth, businessController.showBusine
 businessRouter.post(
   "/business/setup",
   requireAuth,
-  uploadLogo.single("logo"),
+  uploadLogo.fields([{ name: "logo", maxCount: 1 }, { name: "signature", maxCount: 1 }]),
   businessController.saveBusinessSetup
 );

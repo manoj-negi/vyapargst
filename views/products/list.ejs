@@ -1,194 +1,155 @@
-<%- include('../partials/layout-start', { title: 'Products', activeNav: 'products' }) %>
+<%- include('../partials/layout-start', { title: 'Items', activeNav: 'products' }) %>
+<% var anyFilter = filters.q || filters.category || filters.gstRate || filters.stockStatus; %>
+<div class="page" data-list-key="/products">
+  <%- include('../partials/page-header', {
+    title: 'Items',
+    subtitle: 'Products and services you sell or buy. Stock updates automatically from sales, purchases and returns.',
+    actions: '<a href="/products/new" class="btn btn-primary"><i class="icon-plus"></i> Add item</a>'
+  }) %>
 
-<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-  <ul class="nav nav-pills">
-    <li class="nav-item">
-      <a class="nav-link <%= filters.type === 'product' ? 'active' : '' %>" href="/products?type=product">Products</a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link <%= filters.type === 'service' ? 'active' : '' %>" href="/products?type=service">Services</a>
-    </li>
-  </ul>
-  <div class="d-flex gap-2">
-    <a href="/invoices/new" class="btn btn-outline-primary"><i class="icon-plus"></i> Add Sale</a>
-    <a href="/products/new" class="btn btn-accent"><i class="icon-plus"></i> Add Item</a>
-  </div>
-</div>
+  <div class="panel">
+    <form method="GET" action="/products" class="filter-bar" id="filterForm" role="search">
+      <input type="hidden" name="type" value="<%= filters.type %>">
+      <div class="chips align-self-end me-2" role="tablist" aria-label="Item type">
+        <a class="chip <%= filters.type !== 'service' ? 'active' : '' %>" href="/products?type=product" role="tab" aria-selected="<%= filters.type !== 'service' %>"><i class="icon-package"></i> Products</a>
+        <a class="chip <%= filters.type === 'service' ? 'active' : '' %>" href="/products?type=service" role="tab" aria-selected="<%= filters.type === 'service' %>"><i class="icon-wrench"></i> Services</a>
+      </div>
+      <div class="f f-search">
+        <label class="form-label" for="fq">Search</label>
+        <div class="search-input"><i class="icon-search"></i><input type="search" id="fq" name="q" class="form-control form-control-sm" placeholder="Name, code, HSN or barcode" value="<%= filters.q %>" autocomplete="off"></div>
+      </div>
+      <div class="f f-select-lg">
+        <label class="form-label" for="fcat">Category</label>
+        <select id="fcat" name="category" class="form-select form-select-sm">
+          <option value="">All categories</option>
+          <% categories.forEach(function(c) { %><option value="<%= c.id %>" <%= filters.category === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        </select>
+      </div>
+      <div class="f f-select">
+        <label class="form-label" for="fgst">GST rate</label>
+        <select id="fgst" name="gstRate" class="form-select form-select-sm">
+          <option value="">All rates</option>
+          <% taxes.forEach(function(t) { %><option value="<%= t.id %>" <%= filters.gstRate === t.id ? 'selected' : '' %>><%= t.rate %>%</option><% }) %>
+        </select>
+      </div>
+      <% if (filters.type !== 'service') { %>
+      <div class="f f-select">
+        <label class="form-label" for="fstock">Stock</label>
+        <select id="fstock" name="stockStatus" class="form-select form-select-sm">
+          <option value="">Any</option>
+          <option value="low" <%= filters.stockStatus === 'low' ? 'selected' : '' %>>Low stock</option>
+          <option value="out" <%= filters.stockStatus === 'out' ? 'selected' : '' %>>Out of stock</option>
+        </select>
+      </div>
+      <% } %>
+      <div class="f-actions">
+        <a href="/products?type=<%= filters.type %>" class="btn btn-sm btn-outline-secondary" id="clearFilters" <%= anyFilter ? '' : 'hidden' %>>Clear</a>
+        <noscript><button type="submit" class="btn btn-sm btn-primary">Apply</button></noscript>
+      </div>
+    </form>
 
-<div class="card p-3 mb-3">
-  <form method="GET" action="/products" class="row g-2 align-items-end" id="filterForm">
-    <input type="hidden" name="type" value="<%= filters.type %>">
-    <div class="col-md-4">
-      <label class="form-label small fw-semibold mb-1">Search</label>
-      <input type="text" name="q" class="form-control form-control-sm" placeholder="Name, item code, HSN or barcode" value="<%= filters.q %>">
-    </div>
-    <div class="col-md-3">
-      <label class="form-label small fw-semibold mb-1">Category</label>
-      <select name="category" class="form-select form-select-sm">
-        <option value="">All Categories</option>
-        <% categories.forEach(function(c) { %>
-          <option value="<%= c.id %>" <%= filters.category === c.id ? 'selected' : '' %>><%= c.name %></option>
-        <% }) %>
-      </select>
-    </div>
-    <div class="col-md-2">
-      <label class="form-label small fw-semibold mb-1">GST Rate</label>
-      <select name="gstRate" class="form-select form-select-sm">
-        <option value="">All Rates</option>
-        <% taxes.forEach(function(t) { %>
-          <option value="<%= t.id %>" <%= filters.gstRate === t.id ? 'selected' : '' %>><%= t.rate %>%</option>
-        <% }) %>
-      </select>
-    </div>
-    <div class="col-md-2">
-      <label class="form-label small fw-semibold mb-1">Stock Status</label>
-      <select name="stockStatus" class="form-select form-select-sm">
-        <option value="">All</option>
-        <option value="low" <%= filters.stockStatus === 'low' ? 'selected' : '' %>>Low Stock</option>
-        <option value="out" <%= filters.stockStatus === 'out' ? 'selected' : '' %>>Out of Stock</option>
-      </select>
-    </div>
-    <div class="col-md-1">
-      <button type="submit" class="btn btn-sm btn-primary-app w-100">Filter</button>
-    </div>
-  </form>
-</div>
-
-<div class="card">
-  <div class="table-scroll">
-    <table class="table table-app mb-0">
-      <thead>
-        <tr>
-          <th>Item Name</th><th>Item Code</th><th>HSN</th><th>Category</th><th>Unit</th>
-          <th>Sale Price</th><th>Purchase Price</th><th>GST Rate</th><th>Stock</th><th>Status</th><th></th>
-        </tr>
-      </thead>
-      <tbody>
-        <% if (products.length === 0) { %>
-          <tr><td colspan="11">
-            <div class="empty-state">
-              <i class="icon-package"></i>
-              No items found. <a href="/products/new">Add your first item</a>.
-            </div>
-          </td></tr>
-        <% } %>
-        <% products.forEach(function(p) { %>
+    <div class="table-scroll sticky" id="resultsWrap" aria-live="polite">
+      <table class="table table-app" id="itemsTable" data-sortable data-page-size="50">
+        <thead>
           <tr>
-            <td><a href="/products/<%= p.id %>/edit" class="fw-semibold"><%= p.name %></a></td>
-            <td><%= p.itemCode || '-' %></td>
-            <td><%= p.hsnCode || '-' %></td>
-            <td><%= p.category ? p.category.name : '-' %></td>
-            <td><%= p.unit ? p.unit.name : '-' %></td>
-            <td>₹<%= Number(p.salePrice).toFixed(2) %></td>
-            <td><%= p.purchasePrice ? '₹' + Number(p.purchasePrice).toFixed(2) : '-' %></td>
-            <td><%= p.tax ? p.tax.rate + '%' : 'Exempt' %></td>
-            <td>
-              <%= Number(p.currentStock) %>
-              <% if (Number(p.currentStock) <= 0) { %>
-                <span class="status-badge status-unpaid">Out</span>
-              <% } else if (Number(p.currentStock) <= Number(p.minStock)) { %>
-                <span class="status-badge status-partial">Low</span>
-              <% } %>
-            </td>
-            <td>
-              <span class="status-badge <%= p.isActive ? 'status-paid' : 'status-unpaid' %>"><%= p.isActive ? 'Active' : 'Inactive' %></span>
-            </td>
-            <td class="d-flex gap-1">
-              <a href="/products/<%= p.id %>/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
-              <form method="POST" action="/products/<%= p.id %>/delete" onsubmit="return confirm('Are you sure you want to delete this item?');" style="margin:0;">
-                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-              </form>
-            </td>
+            <th data-sort="text">Item</th>
+            <th data-sort="text" style="width:120px">Code</th>
+            <th data-sort="text" style="width:100px">HSN</th>
+            <th data-sort="text" style="width:150px">Category</th>
+            <th data-sort="num" class="num" style="width:120px">Sale price</th>
+            <th data-sort="num" class="num" style="width:120px">Purchase</th>
+            <th data-sort="num" class="num" style="width:70px">GST</th>
+            <% if (filters.type !== 'service') { %><th data-sort="num" class="num" style="width:120px">Stock</th><% } %>
+            <th class="text-end" style="width:110px"><span class="visually-hidden">Actions</span></th>
           </tr>
-        <% }) %>
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          <% if (products.length === 0) { %>
+            <tr data-static><td colspan="9">
+              <div class="empty-state">
+                <i class="icon-package"></i>
+                <% if (anyFilter) { %>
+                  <div class="title">No items match these filters</div>
+                  <a href="/products?type=<%= filters.type %>">Clear filters</a>
+                <% } else { %>
+                  <div class="title">No <%= filters.type === 'service' ? 'services' : 'products' %> yet</div>
+                  <a href="/products/new" class="btn btn-sm btn-primary"><i class="icon-plus"></i> Add item</a>
+                <% } %>
+              </div>
+            </td></tr>
+          <% } %>
+          <% products.forEach(function(p) { var stock = Number(p.currentStock); %>
+            <tr>
+              <td>
+                <a href="/products/<%= p.id %>/edit" class="cell-main d-block cell-truncate" title="<%= p.name %>"><%= p.name %></a>
+                <% if (p.unit) { %><div class="cell-sub"><%= p.unit.name %></div><% } %>
+              </td>
+              <td class="muted"><%= p.itemCode || '—' %></td>
+              <td class="muted"><%= p.hsnCode || '—' %></td>
+              <td><div class="cell-truncate" title="<%= p.category ? p.category.name : '' %>"><%= p.category ? p.category.name : '—' %></div></td>
+              <td class="num" data-sort-value="<%= Number(p.salePrice) %>"><%= inr(p.salePrice) %><div class="cell-sub"><%= p.priceType === 'INCLUSIVE' ? 'incl. tax' : 'excl. tax' %></div></td>
+              <td class="num" data-sort-value="<%= p.purchasePrice ? Number(p.purchasePrice) : 0 %>"><%= p.purchasePrice ? inr(p.purchasePrice) : '—' %></td>
+              <td class="num" data-sort-value="<%= p.tax ? Number(p.tax.rate) : -1 %>"><%= p.tax ? Number(p.tax.rate) + '%' : 'Exempt' %></td>
+              <% if (filters.type !== 'service') { %>
+              <td class="num" data-sort-value="<%= stock %>">
+                <span class="<%= stock <= 0 ? 'text-danger fw-semibold' : (stock <= Number(p.minStock) ? 'text-warning fw-semibold' : '') %>"><%= qty(stock) %></span>
+                <% if (stock <= 0) { %><div class="cell-sub text-danger">Out of stock</div><% } else if (stock <= Number(p.minStock)) { %><div class="cell-sub text-warning">Low</div><% } %>
+              </td>
+              <% } %>
+              <td>
+                <div class="row-actions">
+                  <a href="/products/<%= p.id %>/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
+                  <form method="POST" action="/products/<%= p.id %>/delete" class="m-0" data-confirm="Remove “<%= p.name %>” from your item list? It stays on past invoices and its history is kept." data-confirm-title="Remove item?" data-confirm-label="Remove item" data-confirm-cancel="Keep item" data-confirm-busy="Removing…">
+                    <button type="submit" class="btn btn-sm btn-outline-danger btn-icon" title="Remove <%= p.name %>" aria-label="Remove <%= p.name %>"><i class="icon-trash-2"></i></button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
 <script>
-  (function() {
-    const filterForm = document.getElementById('filterForm');
-    const tableBody = document.querySelector('.table-app tbody');
-    let debounceTimer;
-    let currentRequestId = 0;
+  // Live filtering: re-fetch this page with the new query and swap in the table body.
+  (function () {
+    var form = document.getElementById('filterForm');
+    var table = document.getElementById('itemsTable');
+    var clear = document.getElementById('clearFilters');
+    if (!form || !table) return;
+    var timer, controller;
 
-    filterForm.addEventListener('input', function() {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        const requestId = ++currentRequestId;
-        const url = new URL(filterForm.action, window.location.origin);
-        const params = new URLSearchParams(new FormData(filterForm));
-        url.search = params.toString();
+    async function refresh() {
+      if (controller) controller.abort();
+      controller = new AbortController();
+      var url = new URL(form.action, location.origin);
+      new FormData(form).forEach(function (v, k) { if (v) url.searchParams.set(k, v); });
+      table.closest('.table-scroll').style.opacity = '0.6';
+      try {
+        var res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) return;
+        var doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+        var fresh = doc.querySelector('#itemsTable tbody');
+        if (fresh) table.tBodies[0].innerHTML = fresh.innerHTML;
+        table.dispatchEvent(new Event('rows:changed'));
+        history.replaceState(null, '', url);
+        try { sessionStorage.setItem('list:/products', url.pathname + url.search); } catch (e) {}
+        var active = ['q', 'category', 'gstRate', 'stockStatus'].some(function (k) { return url.searchParams.get(k); });
+        if (clear) clear.hidden = !active;
+      } catch (err) {
+        if (err.name !== 'AbortError') console.error('Filter failed', err);
+      } finally {
+        table.closest('.table-scroll').style.opacity = '';
+      }
+    }
 
-        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-          .then(res => res.text())
-          .then(html => {
-            if (requestId !== currentRequestId) return; // Prevent older response from replacing newer one
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const newTbody = doc.querySelector('.table-app tbody');
-            if (newTbody && tableBody) {
-              tableBody.innerHTML = newTbody.innerHTML;
-            }
-            window.history.replaceState({}, '', url);
-          })
-          .catch(err => console.error("Filter error:", err));
-      }, 250);
+    form.addEventListener('submit', function (e) { e.preventDefault(); refresh(); });
+    form.querySelectorAll('input[type=search]').forEach(function (input) {
+      input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(refresh, 250); });
     });
+    form.querySelectorAll('select').forEach(function (sel) { sel.addEventListener('change', refresh); });
   })();
 </script>
-<script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const filterForm = document.getElementById('filterForm');
-    const tbody = document.querySelector('.table-app tbody');
-    if (!filterForm || !tbody) return;
-
-    let debounceTimer;
-    let latestAbortController;
-
-    const fetchResults = async () => {
-      if (latestAbortController) latestAbortController.abort();
-      latestAbortController = new AbortController();
-
-      const url = new URL(filterForm.action, window.location.origin);
-      const formData = new FormData(filterForm);
-      for (const [key, value] of formData.entries()) {
-        url.searchParams.append(key, value);
-      }
-
-      try {
-        const response = await fetch(url, { signal: latestAbortController.signal });
-        if (!response.ok) return;
-        const html = await response.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const newTbody = doc.querySelector('.table-app tbody');
-        if (newTbody) {
-          tbody.innerHTML = newTbody.innerHTML;
-        }
-        
-        window.history.replaceState({}, '', url);
-      } catch (err) {
-        if (err.name !== 'AbortError') console.error('Filter fetch error:', err);
-      }
-    };
-
-    filterForm.querySelectorAll('input, select').forEach(input => {
-      if (input.type === 'text') {
-        input.addEventListener('input', () => {
-          clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(fetchResults, 250);
-        });
-      } else {
-        input.addEventListener('change', fetchResults);
-      }
-    });
-    
-    // Hide the filter button since filtering is now automatic
-    const filterBtn = filterForm.querySelector('button[type="submit"]');
-    if (filterBtn) filterBtn.parentElement.style.display = 'none';
-  });
-</script>
-
 <%- include('../partials/layout-end') %>

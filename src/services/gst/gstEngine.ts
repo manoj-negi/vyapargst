@@ -50,6 +50,9 @@ export function calculateLineItem(input: LineItemInput): LineItemResult {
       ? grossAmount.times(toDecimal(input.discountValue)).dividedBy(100)
       : toDecimal(input.discountValue);
 
+  if (discountAmount.greaterThan(grossAmount)) {
+    throw new RangeError("Line discount cannot be more than the line amount");
+  }
   const amountAfterDiscount = grossAmount.minus(discountAmount);
 
   let taxableValue: Decimal;
@@ -102,9 +105,18 @@ export interface InvoiceDiscountInput {
   type: DiscountType;
 }
 
+export interface InvoiceChargesInput {
+  /** Charge amount before tax (delivery, packing, etc.) */
+  amount: Decimal.Value;
+  gstRate: Decimal.Value;
+}
+
 export interface InvoiceTotalsInput {
   lines: LineItemResult[];
   invoiceDiscount?: InvoiceDiscountInput | null;
+  /** Taxed like an extra exclusive-priced line; the invoice discount does not apply to it. */
+  charges?: InvoiceChargesInput | null;
+  isIntraState?: boolean;
   roundOffMode: RoundOffMode;
   manualRoundOff?: Decimal.Value;
 }
@@ -122,6 +134,8 @@ export interface TaxRateGroup {
 export interface InvoiceTotalsResult {
   subtotal: Decimal;
   discount: Decimal;
+  charges: Decimal;
+  chargesTax: Decimal;
   taxableAmount: Decimal;
   cgst: Decimal;
   sgst: Decimal;
@@ -146,6 +160,9 @@ export function calculateInvoiceTotals(input: InvoiceTotalsInput): InvoiceTotals
       ? subtotal.times(toDecimal(input.invoiceDiscount.value)).dividedBy(100)
       : toDecimal(input.invoiceDiscount.value)
     : new Decimal(0);
+  if (invoiceDiscountAmount.greaterThan(subtotal)) {
+    throw new RangeError("Invoice discount cannot be more than the subtotal");
+  }
 
   const ratio = subtotal.isZero()
     ? new Decimal(1)
@@ -180,6 +197,25 @@ export function calculateInvoiceTotals(input: InvoiceTotalsInput): InvoiceTotals
     }
   }
 
+  const chargesAmount = round2(input.charges?.amount ?? 0);
+  let chargesTax = new Decimal(0);
+  if (chargesAmount.greaterThan(0)) {
+    const rate = toDecimal(input.charges!.gstRate);
+    const intra = input.isIntraState ?? input.lines[0]?.isIntraState ?? true;
+    const { cgst, sgst, igst } = splitGst(chargesAmount, rate, intra);
+    chargesTax = cgst.plus(sgst).plus(igst);
+    const key = `${rate.toString()}|${intra}`;
+    const existing = groupsByRate.get(key);
+    if (existing) {
+      existing.taxableAmount = existing.taxableAmount.plus(chargesAmount);
+      existing.cgst = existing.cgst.plus(cgst);
+      existing.sgst = existing.sgst.plus(sgst);
+      existing.igst = existing.igst.plus(igst);
+    } else {
+      groupsByRate.set(key, { gstRate: rate, isIntraState: intra, taxableAmount: chargesAmount, cgst, sgst, igst, cess: new Decimal(0) });
+    }
+  }
+
   const taxGroups = Array.from(groupsByRate.values()).sort((a, b) =>
     a.gstRate.comparedTo(b.gstRate)
   );
@@ -207,6 +243,8 @@ export function calculateInvoiceTotals(input: InvoiceTotalsInput): InvoiceTotals
   return {
     subtotal: round2(subtotal),
     discount: round2(invoiceDiscountAmount),
+    charges: chargesAmount,
+    chargesTax: round2(chargesTax),
     taxableAmount: round2(taxableAmount),
     cgst: round2(cgst),
     sgst: round2(sgst),

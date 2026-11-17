@@ -1,48 +1,135 @@
-<%- include('../partials/layout-start', { title: invoice ? 'Edit Invoice ' + invoice.invoiceNo : 'Create Sale Invoice', activeNav: 'invoices' }) %>
+<%- include('../partials/layout-start', { title: title, activeNav: config.activeNav }) %>
+<%
+  var src = invoice || prefill || {};
+  var isPurchase = config.side === 'PURCHASE';
+  var takesPayment = !!config.settlementDirection;
+  function dateVal(v) { return v ? new Date(v).toISOString().slice(0,10) : ''; }
+  var fe = fieldErrors || {};
+%>
 
-<div class="sale-page">
-  <% if (errors && errors.length) { %>
-    <div class="alert alert-danger py-2 small">
-      <ul class="mb-0 ps-3"><% errors.forEach(function(e) { %><li><%= e %></li><% }) %></ul>
-    </div>
-  <% } %>
+<div class="sale-page<%= typeof showProfit !== 'undefined' && showProfit ? ' has-profit-rail' : '' %>">
+  <%- include('../partials/page-header', {
+    title: invoice ? 'Edit ' + config.label + ' ' + invoice.invoiceNo : 'New ' + config.label,
+    subtitle: invoice ? 'Saving re-applies stock and balances for this ' + config.label.toLowerCase() + '; payments already recorded stay linked.' : (config.docType === 'ESTIMATE' ? 'Estimates do not change stock or balances until converted to an invoice.' : 'Type to search items by name, code, HSN or barcode. Enter on the last field adds a row.'),
+    back: invoice ? { href: config.basePath + '/' + invoice.id, label: config.label + ' ' + invoice.invoiceNo } : { href: config.basePath, label: config.pluralLabel, key: config.basePath },
+    actions: null
+  }) %>
+  <%- include('../partials/form-errors', { errors: errors }) %>
 
-  <form method="POST" action="<%= invoice ? '/invoices/' + invoice.id + '/edit' : '/invoices' %>" id="invoiceForm" data-business-state="<%= business.state %>">
+  <form method="POST" action="<%= invoice ? config.basePath + '/' + invoice.id + '/edit' : config.basePath %>" id="invoiceForm" data-business-state="<%= business.state %>" data-side="<%= config.side %>" data-dirty-guard<%- config.docType === 'SALE_INVOICE' ? ' data-discount-history="1"' : '' %><%- invoice ? ' data-invoice-id="' + invoice.id + '"' : '' %>>
+    <input type="hidden" name="clientToken" value="<%= clientToken %>">
+    <% if (src.convertedFromId) { %><input type="hidden" name="convertedFromId" value="<%= src.convertedFromId %>"><% } %>
+    <% if (src.originalDocId) { %><input type="hidden" name="originalDocId" value="<%= src.originalDocId %>"><% } %>
+    <% if (src.sourceLabel) { %>
+      <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span><i class="icon-link"></i> <%= src.sourceLabel %></span>
+        <% if (config.returnOf) { %>
+          <label class="form-check mb-0"><input type="checkbox" class="form-check-input" name="adjustAgainstOriginal" <%= src.adjustAgainstOriginal ? 'checked' : '' %>> Set off against that bill's balance</label>
+        <% } %>
+      </div>
+    <% } %>
     <section class="sale-hero">
       <div class="sale-hero-customer">
-        <div class="sale-eyebrow"><i class="icon-receipt-indian-rupee"></i> <%= invoice ? 'Edit Sale' : 'New Sale' %></div>
-        <label class="form-label small fw-semibold" for="customerSelect">Bill To *</label>
+        <div class="sale-eyebrow"><i class="icon-receipt-indian-rupee"></i> <%= invoice ? 'Edit ' + config.label + ' ' + invoice.invoiceNo : 'New ' + config.label %></div>
+        <div class="party-row">
+        <div class="party-main">
+        <label class="form-label" for="customerSelect"><%= isPurchase ? 'Supplier' : 'Bill to' %> <span class="req">*</span></label>
         <div class="d-flex gap-2">
-          <select name="customerId" id="customerSelect" class="form-select" required>
-            <option value="">Select Customer</option>
+          <select name="customerId" id="customerSelect" class="form-select<%= invalid(fe, 'customerId') %>" required>
+            <option value="">Select <%= config.partyLabel %></option>
             <% customers.forEach(function(c) { %>
-              <option value="<%= c.id %>" data-state="<%= c.state %>" <%= invoice && invoice.customerId === c.id ? 'selected' : '' %>><%= c.name %><%= c.section ? ' (' + c.section + ')' : '' %><%= c.phone ? ' · ' + c.phone : '' %></option>
+              <option value="<%= c.id %>" data-state="<%= c.state %>" data-section="<%= c.section || '' %>" data-department="<%= c.department || '' %>" <%= src.customerId === c.id ? 'selected' : '' %>><%= c.name %><%= c.section ? ' (' + c.section + ')' : '' %><%= c.phone ? ' · ' + c.phone : '' %></option>
             <% }) %>
           </select>
-          <button type="button" class="btn btn-outline-primary text-nowrap" data-bs-toggle="modal" data-bs-target="#newCustomerModal">
-            <i class="icon-plus"></i> New Customer
+          <button type="button" class="btn btn-outline-primary text-nowrap" data-bs-toggle="modal" data-bs-target="#newCustomerModal" title="Add a <%= config.partyLabel.toLowerCase() %> without leaving this page">
+            <i class="icon-user-plus"></i> New
           </button>
         </div>
-        <div class="mt-2">
+        <%- fieldError(fe, 'customerId') %>
+        </div>
+        <% if (!isPurchase) {
+          // An older value saved under the combined "Section / Department" label stays unclassified until the user says which it is
+          var legacyText = (src.legacySectionDepartment === true || src.legacySectionDepartment === '1') && src.department ? src.department : '';
+        %>
+        <div class="party-dept">
+          <label class="form-label" for="sectionInput">Section</label>
+          <input type="text" name="section" id="sectionInput" class="form-control<%= invalid(fe, 'section') %>" list="sectionList" maxlength="80" autocomplete="off" placeholder="Optional" value="<%= src.section || '' %>" <%= legacyText ? 'disabled' : '' %>>
+          <datalist id="sectionList"></datalist>
+          <%- fieldError(fe, 'section') %>
+        </div>
+        <div class="party-dept">
+          <label class="form-label" for="departmentInput">Department</label>
+          <input type="text" name="department" id="departmentInput" class="form-control<%= invalid(fe, 'department') %>" list="departmentList" maxlength="80" autocomplete="off" placeholder="Optional" value="<%= legacyText ? '' : (src.department || '') %>" <%= legacyText ? 'disabled' : '' %>>
+          <datalist id="departmentList"></datalist>
+          <%- fieldError(fe, 'department') %>
+        </div>
+        <% if (legacyText) { %>
+        <div class="party-legacy" id="legacyDivision" data-text="<%= legacyText %>">
+          <input type="hidden" name="legacySectionDepartment" value="1" data-legacy-flag>
+          <input type="hidden" name="department" value="<%= legacyText %>" data-legacy-value>
+          <i class="icon-circle-alert" aria-hidden="true"></i>
+          <div class="party-legacy-body" data-legacy-body>
+            <div>“<strong><%= legacyText %></strong>” was saved under the old combined label <em>Section / Department</em>. Which is it?</div>
+            <div class="party-legacy-actions">
+              <button type="button" class="btn btn-sm btn-outline-primary" data-classify="section">It's a section</button>
+              <button type="button" class="btn btn-sm btn-outline-primary" data-classify="department">It's a department</button>
+              <span class="small text-muted">Until you choose, it is kept exactly as typed and printed without a label.</span>
+            </div>
+          </div>
+        </div>
+        <% } %>
+        <% } %>
+        </div>
+        <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
           <span id="placeOfSupplyBadge" class="badge text-bg-secondary">Select a customer</span>
+          <span class="small text-muted">Tax type follows the party's state.</span>
         </div>
       </div>
       <div class="sale-hero-dates">
         <div>
-          <label class="form-label small fw-semibold" for="invoiceDate">Invoice Date</label>
-          <input type="date" name="invoiceDate" id="invoiceDate" class="form-control" value="<%= invoice ? new Date(invoice.invoiceDate).toISOString().slice(0,10) : new Date().toISOString().slice(0,10) %>">
+          <label class="form-label" for="invoiceDate">Date</label>
+          <input type="date" name="invoiceDate" id="invoiceDate" class="form-control" value="<%= dateVal(src.invoiceDate) || new Date().toISOString().slice(0,10) %>">
+        </div>
+        <% if (config.docType !== 'CREDIT_NOTE' && config.docType !== 'DEBIT_NOTE') { %>
+        <div>
+          <label class="form-label" for="dueDate"><%= config.docType === 'ESTIMATE' ? 'Valid Until' : 'Due Date' %></label>
+          <input type="date" name="dueDate" id="dueDate" class="form-control" value="<%= dateVal(src.dueDate) %>">
+        </div>
+        <% } %>
+        <% if (isPurchase) { %>
+        <div>
+          <label class="form-label" for="partyInvoiceNo">Supplier Bill No.</label>
+          <input type="text" name="partyInvoiceNo" id="partyInvoiceNo" class="form-control" maxlength="40" value="<%= src.partyInvoiceNo || '' %>">
         </div>
         <div>
-          <label class="form-label small fw-semibold" for="dueDate">Due Date</label>
-          <input type="date" name="dueDate" id="dueDate" class="form-control" value="<%= invoice && invoice.dueDate ? new Date(invoice.dueDate).toISOString().slice(0,10) : '' %>">
+          <label class="form-label" for="partyInvoiceDate">Supplier Bill Date</label>
+          <input type="date" name="partyInvoiceDate" id="partyInvoiceDate" class="form-control" value="<%= dateVal(src.partyInvoiceDate) %>">
         </div>
+        <% } %>
+        <% if (typeof showProfit !== 'undefined' && showProfit) { %>
+        <%# Owner-only, never printed: the figures are fetched from /api/invoices/profit only after the eye is clicked %>
+        <section class="profit-card no-print" id="profitCard" aria-labelledby="profitTitle" data-profit-card>
+          <div class="profit-head">
+            <h2 class="profit-title" id="profitTitle"><i class="icon-trending-up" aria-hidden="true"></i> Invoice profit <span class="profit-private"><i class="icon-lock" aria-hidden="true"></i> Only you</span></h2>
+            <button type="button" class="profit-eye" aria-pressed="false" aria-controls="profitBody" aria-label="Show profit" title="Show profit" data-profit-toggle><i class="icon-eye" aria-hidden="true"></i></button>
+          </div>
+          <div class="profit-masked" data-profit-masked>
+            <div class="profit-row"><span>Estimated gross profit</span><strong aria-label="hidden">••••</strong></div>
+            <div class="profit-row"><span>Margin</span><strong aria-label="hidden">••••</strong></div>
+          </div>
+          <div class="profit-body" id="profitBody" data-profit-body hidden aria-live="polite"></div>
+        </section>
+        <% } %>
       </div>
     </section>
 
     <section class="sale-panel">
       <div class="sale-panel-head">
-        <h6 class="sale-panel-title">Items</h6>
-        <button type="button" id="addRowBtn" class="btn btn-sm sale-add-row"><i class="icon-plus"></i> Add Row</button>
+        <h2 class="sale-panel-title">Items <span class="hint fw-normal ms-2 kbd-hint">↑ ↓ to pick from search · Enter to choose</span></h2>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#newItemModal"><i class="icon-package-plus"></i> New item</button>
+          <button type="button" id="addRowBtn" class="btn btn-sm sale-add-row" title="Add row (Alt+A)"><i class="icon-plus"></i> Add row</button>
+        </div>
       </div>
       <div class="table-scroll">
         <table class="table table-app sale-items-table mb-0">
@@ -70,62 +157,85 @@
 
     <div class="sale-bottom">
       <section class="sale-panel">
-        <h6 class="sale-panel-title">Payment</h6>
+        <h2 class="sale-panel-title"><%= takesPayment ? (config.settlementDirection === 'IN' ? 'Payment received' : 'Payment made') : 'Notes' %></h2>
+        <% if (takesPayment) { %>
         <div class="sale-payment-grid">
           <div>
-            <label class="form-label small fw-semibold" for="paymentType">Payment Type</label>
-            <select name="paymentType" id="paymentType" class="form-select">
-              <option value="CASH">Cash</option>
+            <label class="form-label" for="paymentType">Mode</label>
+            <select name="paidNowMode" id="paymentType" class="form-select" <%= invoice ? 'disabled' : '' %>>
+              <option value="CREDIT">Credit (unpaid)</option>
+              <option value="CASH" <%= !invoice ? 'selected' : '' %>>Cash</option>
               <option value="UPI">UPI</option>
               <option value="BANK_TRANSFER">Bank Transfer</option>
               <option value="CARD">Card</option>
-              <option value="CREDIT">Credit</option>
               <option value="OTHER">Other</option>
             </select>
           </div>
           <div>
-            <label class="form-label small fw-semibold" for="receivedInput">Received Amount</label>
-            <div class="input-group">
-              <span class="input-group-text">₹</span>
-              <input type="number" name="receivedAmount" id="receivedInput" class="form-control" min="0" step="0.01" value="<%= invoice ? invoice.receivedAmount : 0 %>" <%= invoice && invoice.receivedAmount > 0 ? 'readonly' : '' %>>
+            <label class="form-label" for="receivedInput">Amount <%= invoice ? 'settled' : 'now' %></label>
+            <div class="price-pair">
+              <span class="rupee">₹</span>
+              <input type="number" name="paidNowAmount" id="receivedInput" class="form-control<%= invalid(fe, 'paidNowAmount') %>" min="0" step="0.01" value="<%= invoice ? Number(invoice.receivedAmount) : (src.paidNowAmount || 0) %>" <%= invoice ? 'readonly' : '' %>>
             </div>
-            <% if (invoice && invoice.receivedAmount > 0) { %>
-              <div class="form-text text-muted">Use 'Record Payment' to change this.</div>
+            <% if (invoice) { %>
+              <div class="form-text">Add payments from the <%= config.label.toLowerCase() %> page (Record Payment).</div>
             <% } %>
           </div>
-        </div>
-        <div class="sale-balance">
+          <% if (!invoice) { %>
           <div>
-            <div class="text-muted small">Balance Due</div>
+            <label class="form-label" for="paidNowReference">Reference <span class="text-muted fw-normal">(UTR / cheque no.)</span></label>
+            <input type="text" name="paidNowReference" id="paidNowReference" class="form-control" maxlength="60" value="<%= src.paidNowReference || '' %>">
+          </div>
+          <% } %>
+        </div>
+        <% } %>
+        <div class="sale-balance <%= takesPayment ? '' : 'd-none' %>">
+          <div>
+            <div class="text-muted small">Balance due</div>
             <div id="balanceDisplay" class="sale-balance-value">₹0.00</div>
           </div>
-          <span id="paymentStatusBadge" class="status-badge status-unpaid">UNPAID</span>
+          <span id="paymentStatusBadge" class="status-badge status-unpaid">Unpaid</span>
+        </div>
+        <div class="mt-3">
+          <label class="form-label" for="notes">Notes</label>
+          <textarea name="notes" id="notes" class="form-control" rows="2" maxlength="1000"><%= src.notes || '' %></textarea>
         </div>
       </section>
 
       <section class="sale-receipt">
         <div class="sale-receipt-row">
-          <span>Invoice Discount</span>
+          <label for="invoiceDiscountValue" class="mb-0">Discount on bill</label>
           <div class="sale-inv-discount">
-            <input type="number" name="invoiceDiscountValue" id="invoiceDiscountValue" class="form-control form-control-sm" value="<%= invoice ? invoice.discount : 0 %>" min="0" step="0.01" aria-label="Invoice discount">
+            <input type="number" name="invoiceDiscountValue" id="invoiceDiscountValue" class="form-control form-control-sm<%= invalid(fe, 'invoiceDiscountValue') %>" value="<%= Number(src.invoiceDiscountValue || 0) %>" min="0" step="0.01" aria-label="Invoice discount">
             <select name="invoiceDiscountType" id="invoiceDiscountType" class="form-select form-select-sm" aria-label="Invoice discount type">
               <option value="PERCENTAGE">%</option>
-              <option value="FIXED" <%= invoice ? 'selected' : '' %>>₹</option>
+              <option value="FIXED" <%= src.invoiceDiscountType === 'FIXED' ? 'selected' : '' %>>₹</option>
+            </select>
+          </div>
+        </div>
+        <div class="sale-receipt-row">
+          <input type="text" name="chargesLabel" class="form-control form-control-sm" style="max-width:150px" placeholder="Delivery charges" value="<%= src.chargesLabel || '' %>" aria-label="Charges label">
+          <div class="sale-inv-discount">
+            <input type="number" name="chargesAmount" id="chargesAmount" class="form-control form-control-sm" value="<%= Number(src.chargesAmount || 0) %>" min="0" step="0.01" aria-label="Charges amount (before tax)" title="Amount before GST">
+            <select name="chargesTaxRate" id="chargesTaxRate" class="form-select form-select-sm" aria-label="GST on charges" title="GST on charges">
+              <% var chargeRates = taxRates.map(function(t){ return Number(t.rate); }); if (chargeRates.indexOf(0) < 0) chargeRates.unshift(0); %>
+              <% chargeRates.forEach(function(r) { %><option value="<%= r %>" <%= Number(src.chargesTaxRate || 0) === r ? 'selected' : '' %>><%= r %>%</option><% }) %>
             </select>
           </div>
         </div>
         <div class="sale-receipt-divider"></div>
         <div class="sale-receipt-row"><span>Subtotal</span><span id="subtotalDisplay">₹0.00</span></div>
         <div class="sale-receipt-row"><span>Discount</span><span id="discountDisplay">₹0.00</span></div>
-        <div class="sale-receipt-row fw-semibold"><span>Taxable Amount</span><span id="taxableDisplay">₹0.00</span></div>
+        <div class="sale-receipt-row"><span>Charges</span><span id="chargesDisplay">₹0.00</span></div>
+        <div class="sale-receipt-row fw-semibold"><span>Taxable amount</span><span id="taxableDisplay">₹0.00</span></div>
         <div class="sale-receipt-row col-cgst-sgst"><span>CGST</span><span id="cgstDisplay">₹0.00</span></div>
         <div class="sale-receipt-row col-cgst-sgst"><span>SGST</span><span id="sgstDisplay">₹0.00</span></div>
         <div class="sale-receipt-row col-igst d-none"><span>IGST</span><span id="igstDisplay">₹0.00</span></div>
-        <div class="sale-receipt-row"><span>CESS</span><span id="cessDisplay">₹0.00</span></div>
+        <div class="sale-receipt-row"><span>Cess</span><span id="cessDisplay">₹0.00</span></div>
         <div class="sale-receipt-row align-items-center">
-          <span>Round Off</span>
+          <label for="manualRoundOffValue" class="mb-0">Round off</label>
           <div class="d-flex align-items-center gap-2">
-            <input type="number" name="manualRoundOff" id="manualRoundOffValue" class="form-control form-control-sm text-end" style="width: 80px;" placeholder="±0.00" step="0.01" title="Enter negative value (e.g. -16) to reduce the bill">
+            <input type="number" name="manualRoundOff" id="manualRoundOffValue" class="form-control form-control-sm text-end" style="width: 84px;" placeholder="Auto" step="0.01" title="Leave blank for automatic. Enter a negative value (e.g. -16) to reduce the bill">
             <span id="roundOffDisplay">₹0.00</span>
           </div>
         </div>
@@ -135,71 +245,150 @@
         </div>
         <input type="hidden" id="grandTotalHidden" value="0">
       </section>
+      <div class="profit-slot-mobile" data-profit-slot-mobile></div>
     </div>
 
     <div class="sale-actionbar">
       <div>
-        <div class="sale-actionbar-label"><span id="itemCountDisplay">0 items</span> · Grand Total</div>
-        <div id="stickyTotalDisplay" class="sale-actionbar-total">₹0.00</div>
+        <div class="sale-actionbar-label"><span id="itemCountDisplay">0 items</span> · Total</div>
+        <div class="d-flex align-items-baseline">
+          <div id="stickyTotalDisplay" class="sale-actionbar-total">₹0.00</div>
+          <% if (takesPayment) { %><div class="balance-chip">Balance <span id="stickyBalanceDisplay">₹0.00</span></div><% } %>
+        </div>
       </div>
-      <div class="d-flex gap-2">
-        <a href="/invoices" class="btn sale-btn-ghost">Cancel</a>
-        <button type="submit" class="btn sale-btn-save" data-shortcut-save>Save Invoice <kbd>Ctrl+S</kbd></button>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="<%= invoice ? config.basePath + '/' + invoice.id : config.basePath %>" class="btn btn-outline-secondary" <%- invoice ? '' : 'data-back-to="' + config.basePath + '"' %>>Cancel</a>
+        <button type="submit" name="after" value="print" class="btn btn-outline-primary"><i class="icon-printer"></i> Save &amp; print</button>
+        <button type="submit" class="btn sale-btn-save" data-shortcut-save><i class="icon-check"></i> Save <kbd>Ctrl+S</kbd></button>
       </div>
     </div>
   </form>
+  <% if (typeof showProfit !== 'undefined' && showProfit) { %>
+  <%# Wide screens: the private profit card sits in its own column to the right of the invoice (moved here by invoice-form.js) %>
+  <aside class="sale-rail no-print" aria-label="Private" data-profit-slot-rail></aside>
+  <% } %>
 </div>
 
 <template id="itemRowTemplate">
   <tr class="invoice-item-row">
-    <td class="row-number">1</td>
-    <td>
-      <input type="text" class="form-control form-control-sm item-name-input" data-name="productName" placeholder="Type item name..." autocomplete="off" required>
+    <td class="row-number" data-label="#">1</td>
+    <td class="cell-item" data-label="Item">
+      <input type="text" class="form-control form-control-sm item-name-input" data-name="productName" placeholder="Search or type item name" autocomplete="off" required aria-label="Item" role="combobox" aria-autocomplete="list" aria-expanded="false">
       <input type="hidden" class="product-id-input" data-name="productId">
       <input type="hidden" class="hsn-input" data-name="hsn">
       <input type="hidden" class="unit-input" data-name="unit">
       <input type="hidden" class="price-type-input" data-name="priceType" value="EXCLUSIVE">
       <input type="hidden" class="gst-rate-input" data-name="gstRate" value="0">
-      <div class="autocomplete-menu"></div>
+      <div class="autocomplete-menu" role="listbox"></div>
+      <div class="stock-hint" aria-live="polite"></div>
     </td>
-    <td><input type="number" class="form-control form-control-sm qty-input" data-name="quantity" min="0.01" step="0.01" value="1"></td>
-    <td><span class="unit-display">-</span></td>
-    <td><input type="number" class="form-control form-control-sm price-input" data-name="unitPrice" min="0" step="0.01" value="0"></td>
-    <td>
+    <td class="cell-qty" data-label="Qty"><input type="number" class="form-control form-control-sm qty-input" data-name="quantity" min="0.01" step="0.01" value="1" aria-label="Quantity"></td>
+    <td class="cell-unit" data-label="Unit"><span class="unit-display">-</span></td>
+    <td class="cell-price" data-label="Price/Unit"><input type="number" class="form-control form-control-sm price-input" data-name="unitPrice" min="0" step="0.01" value="0" aria-label="Price per unit"></td>
+    <td class="cell-disc" data-label="Discount">
       <div class="input-group input-group-sm sale-disc-group">
-        <input type="number" class="form-control discount-input" data-name="discountValue" min="0" step="0.01" value="0">
-        <select class="form-select discount-type-select" data-name="discountType">
+        <input type="number" class="form-control discount-input" data-name="discountValue" min="0" step="0.01" value="0" aria-label="Discount">
+        <select class="form-select discount-type-select" data-name="discountType" aria-label="Discount type">
           <option value="PERCENTAGE">%</option>
           <option value="FIXED">₹</option>
         </select>
       </div>
+      <div class="disc-hint" aria-live="polite"></div>
     </td>
-    <td class="taxable-cell">₹0.00</td>
-    <td class="gst-rate-cell-label">0%</td>
-    <td class="cgst-cell col-cgst-sgst">₹0.00</td>
-    <td class="sgst-cell col-cgst-sgst">₹0.00</td>
-    <td class="igst-cell col-igst d-none">₹0.00</td>
-    <td class="total-cell fw-semibold">₹0.00</td>
-    <td><button type="button" class="sale-remove-row remove-row-btn" title="Remove row" aria-label="Remove row"><i class="icon-trash-2"></i></button></td>
+    <td class="taxable-cell" data-label="Taxable">₹0.00</td>
+    <td class="gst-rate-cell-label" data-label="GST">0%</td>
+    <td class="cgst-cell col-cgst-sgst" data-label="CGST">₹0.00</td>
+    <td class="sgst-cell col-cgst-sgst" data-label="SGST">₹0.00</td>
+    <td class="igst-cell col-igst d-none" data-label="IGST">₹0.00</td>
+    <td class="total-cell fw-semibold" data-label="Total">₹0.00</td>
+    <td class="cell-del"><button type="button" class="sale-remove-row remove-row-btn" title="Remove row" aria-label="Remove row" tabindex="-1"><i class="icon-trash-2"></i></button></td>
   </tr>
 </template>
 
 <%# Kept outside #invoiceForm — HTML forms cannot be nested. %>
-<div class="modal fade" id="newCustomerModal" tabindex="-1">
+<div class="modal fade" id="newCustomerModal" tabindex="-1" data-bs-backdrop="static" aria-labelledby="newCustomerTitle">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <form id="newCustomerForm" novalidate>
         <div class="modal-header">
-          <h6 class="modal-title fw-bold">New Customer</h6>
+          <h2 class="modal-title" id="newCustomerTitle">New <%= config.partyLabel.toLowerCase() %></h2>
+          <input type="hidden" name="partyType" value="<%= isPurchase ? 'SUPPLIER' : 'CUSTOMER' %>">
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <div id="newCustomerErrors" class="alert alert-danger py-2 small d-none"></div>
-          <%- include('../customers/_fields', { customer: null, states: states, defaultState: business.state }) %>
+          <p class="small text-muted mt-0">Your invoice stays as it is; the new <%= config.partyLabel.toLowerCase() %> is selected when saved.</p>
+          <div id="newCustomerErrors" class="alert alert-danger d-none"></div>
+          <%- include('../customers/_fields', { customer: null, states: states, defaultState: business.state, quick: true }) %>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary-app" id="newCustomerSave">Save Customer</button>
+          <button type="submit" class="btn btn-primary-app" id="newCustomerSave">Save <%= config.partyLabel %></button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="newItemModal" tabindex="-1" data-bs-backdrop="static" aria-labelledby="newItemTitle">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <form id="newItemForm" novalidate>
+        <div class="modal-header">
+          <h2 class="modal-title" id="newItemTitle">New item</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mt-0">Saved to your item list and added to this <%= config.label.toLowerCase() %>. Full details can be edited later on the Items page.</p>
+          <div id="newItemErrors" class="alert alert-danger d-none"></div>
+          <div class="fgrid">
+            <div class="s8">
+              <label class="form-label" for="niName">Item name <span class="req">*</span></label>
+              <input type="text" id="niName" name="name" class="form-control" required maxlength="200">
+            </div>
+            <div class="s4">
+              <label class="form-label" for="niType">Type</label>
+              <select id="niType" name="itemType" class="form-select"><option value="PRODUCT">Product</option><option value="SERVICE">Service</option></select>
+            </div>
+            <div class="s4">
+              <label class="form-label" for="niUnit">Unit <span class="req">*</span></label>
+              <select id="niUnit" name="unitName" class="form-select" required>
+                <% unitOptions.forEach(function(u) { %><option value="<%= u.name %>" <%= u.name === 'Pieces' ? 'selected' : '' %>><%= u.name %> (<%= u.shortName %>)</option><% }) %>
+              </select>
+            </div>
+            <div class="s4">
+              <label class="form-label" for="niHsn">HSN / SAC</label>
+              <input type="text" id="niHsn" name="hsnCode" class="form-control" maxlength="8" inputmode="numeric">
+            </div>
+            <div class="s4">
+              <label class="form-label" for="niTax">GST rate</label>
+              <select id="niTax" name="taxId" class="form-select">
+                <option value="">Exempt / Nil</option>
+                <% taxRates.forEach(function(t) { %><option value="<%= t.id %>"><%= t.name %> (<%= t.rate %>%)</option><% }) %>
+              </select>
+            </div>
+            <div class="s6">
+              <label class="form-label" for="niSale">Sale price <span class="req">*</span></label>
+              <div class="price-pair"><span class="rupee">₹</span>
+                <input type="number" id="niSale" name="salePrice" class="form-control" min="0" step="0.01" required placeholder="0.00">
+                <select name="priceType" class="form-select" aria-label="Sale price tax treatment"><option value="INCLUSIVE">With Tax</option><option value="EXCLUSIVE">Without Tax</option></select>
+              </div>
+            </div>
+            <div class="s6">
+              <label class="form-label" for="niPurchase">Purchase price</label>
+              <div class="price-pair"><span class="rupee">₹</span>
+                <input type="number" id="niPurchase" name="purchasePrice" class="form-control" min="0" step="0.01" placeholder="0.00">
+                <select name="purchasePriceType" class="form-select" aria-label="Purchase price tax treatment"><option value="INCLUSIVE">With Tax</option><option value="EXCLUSIVE">Without Tax</option></select>
+              </div>
+            </div>
+            <div class="s4">
+              <label class="form-label" for="niOpening">Opening stock</label>
+              <input type="number" id="niOpening" name="openingStock" class="form-control text-end" min="0" step="0.01" value="0">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="newItemSave">Save &amp; add to <%= config.label.toLowerCase() %></button>
         </div>
       </form>
     </div>
@@ -207,7 +396,7 @@
 </div>
 
 <script>
-  window.__invoiceExistingItems = <%- invoice ? JSON.stringify(invoice.items) : '[]' %>;
+  window.__invoiceExistingItems = <%- JSON.stringify(src.items || []).replace(/</g, '\\u003c') %>;
   (function () {
     var modalEl = document.getElementById('newCustomerModal');
     var form = document.getElementById('newCustomerForm');
@@ -245,12 +434,16 @@
         var optionText = c.name + sectionText + (c.phone ? ' · ' + c.phone : '');
         var option = new Option(optionText, c.id, true, true);
         option.dataset.state = c.state;
+        option.dataset.section = c.section || '';
+        option.dataset.department = c.department || '';
         select.add(option);
         // Let the invoice form recalculate place of supply / CGST-SGST vs IGST for the new customer.
         select.dispatchEvent(new Event('change', { bubbles: true }));
 
         form.reset();
-        bootstrap.Modal.getInstance(modalEl).hide();
+        var instance = bootstrap.Modal.getInstance(modalEl);
+        instance.hide();
+        setTimeout(function () { if (modalEl.classList.contains('show')) instance.hide(); }, 400);
       } catch (err) {
         showErrors(['Network error — please try again.']);
       } finally {
